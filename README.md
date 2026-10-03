@@ -29,7 +29,7 @@ Replace every placeholder:
 - `dmSenders`: the allowed sender MRIs. Newly discovered DMs must have exactly the bridge user and an allowed sender.
 - `groups`: exact chat IDs, allowed sender MRIs and a required prefix; default examples use `!claw`.
 - `namespace`: a stable, unique deployment name for OpenClaw sessions.
-- `openclaw`: a loopback Chat Completions URL, an explicit dedicated agent and a protected local secret file containing `{"token":"YOUR_GATEWAY_TOKEN"}`. `OPENCLAW_TEAMS_GATEWAY_TOKEN` can override that secret.
+- `openclaw`: a loopback Chat Completions URL, an explicit agent ID and a protected local secret file containing `{"token":"YOUR_GATEWAY_TOKEN"}`. `OPENCLAW_TEAMS_GATEWAY_TOKEN` can override that secret.
 
 Unknown fields and invalid values fail validation. Use `--config /absolute/config.local.json` or `OPENCLAW_TEAMS_CONFIG`. Account, state directory, deployment namespace or OpenClaw connection changes require a new state namespace; do not reuse pending jobs against a different destination.
 
@@ -43,9 +43,11 @@ Defaults: polling 5 seconds; DM discovery 60 seconds; 60 Teams requests/minute; 
 
 Enable `gateway.http.endpoints.chatCompletions.enabled` on an authenticated private Gateway. The bridge connects through loopback. Its shared token carries operator authority: chat-session separation does not restrict tools, workspace or memory access.
 
-Use a dedicated agent whose resources are suitable for everyone allowed by the bridge. The validated deployment uses a separate single-agent Gateway on port 18790 with an isolated workspace, no skills and `tools.deny: ["*"]`. The existing personal Gateway remains separate. Enable tools only after explicitly deciding the access all senders should receive.
+Choose the agent whose capabilities you want Teams users to receive. To expose your existing OpenClaw setup, enable this endpoint on its Gateway, set `openclaw.agent` to its existing agent ID (for example `main`), and use its Gateway token. Teams then uses that agent’s configured skills, tools and workspace without duplicating them. Per-chat sessions separate conversation history; they do not isolate shared files, skills, tools or global memory. Everyone on the sender allowlist receives the selected agent’s capabilities.
 
-The tested build uses keyed `agents.entries` and has retired the old `agents.list` and `default` fields. Validate against your installed version; see the isolated [probe setup](experiment/README.md). Every request names the configured agent. Stable `user` values are derived from namespace, account, chat and reset generation, so each group has shared context and each DM has independent context.
+For restricted deployments, select a dedicated agent or separate Gateway with suitable tools and workspace. The initial transport experiment used an isolated tool-free Gateway; that arrangement is optional.
+
+The tested build uses keyed `agents.entries` for explicit agents. Validate against your installed version; see the isolated [probe setup](experiment/README.md). Every request names the configured agent. Stable `user` values are derived from namespace, account, chat and reset generation, so each group has shared context and each DM has independent context.
 
 ## Sign in
 
@@ -100,6 +102,6 @@ npm run check
 npm pack --dry-run
 ```
 
-Tests use synthetic identities, temporary real SQLite, real local HTTP endpoints and process crash injection. Live tenant tests are explicit and separate. Package contents are allowlisted. The package remains private to prevent accidental npm publication; no release workflow uploads tenant credentials. Source is prepared for public GitHub review; publishing and license approval remain the final operator step.
+Tests use synthetic identities, temporary real SQLite, real local HTTP endpoints and process crash injection. Live tenant tests are explicit and separate. Package contents are allowlisted. The package remains private to prevent accidental npm publication; no release workflow uploads tenant credentials. Source is published under the MIT license on GitHub.
 
 See [engineering design](docs/design.md), [review](docs/engineering-review.md), [test plan](docs/engineering-test-plan.md), [security](SECURITY.md) and [contributing](CONTRIBUTING.md).
