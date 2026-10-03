@@ -150,7 +150,9 @@ test("actual service routes new DM/group once, denies history/self/other/untrigg
       calls.every((c) =>
         c.messages.some(
           (m) =>
-            m.role === "system" && m.content.includes("Preserve exact values"),
+            m.role === "system" &&
+            m.content.includes("Preserve exact values") &&
+            m.content.includes("one metric per numbered item"),
         ),
       ),
     );

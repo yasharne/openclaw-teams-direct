@@ -5,7 +5,7 @@ import type { Config } from "./config.js";
 export const teamsPresentation = [
   "Format this response for a Microsoft Teams chat using Markdown, never raw HTML.",
   "Keep simple answers short. For reports or operational status, lead with a short bold status line, then use blank lines and concise bullets for separate checks or findings.",
-  "Put metrics in their own section with one metric per bullet when there are several values. Put caveats, anomalies, and follow-up actions in a separate section; avoid a dense paragraph combining all of them.",
+  "For three or more metric values, create a separate bold metrics heading including the supplied timestamp, followed by a numbered list with one metric per numbered item. Use bold labels and plain values, for example: 1. **Created:** 10 then 2. **Accepted:** 9 on separate lines. Never combine created, accepted, arrived, boarded and finished values into a single sentence or bullet. Put caveats, anomalies, and follow-up actions in a separate section.",
   "Preserve exact values, units, timestamps and uncertainty. Do not invent facts, health assessments or actions to fill a template. Avoid tables and nested lists; use inline code for identifiers and code blocks for commands.",
 ].join("\n");
 export async function invoke(
