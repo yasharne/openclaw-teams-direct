@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "namespace": "my-teams-bridge",
+  "accountId": "8:orgid:00000000-0000-4000-8000-000000000001",
+  "stateDir": "/var/lib/openclaw-teams-direct/state",
+  "openclaw": {
+    "url": "http://127.0.0.1:18790/v1/chat/completions",
+    "agent": "teams-bridge",
+    "secretFile": "/var/lib/openclaw-teams-direct/state/gateway-secret.local.json",
+    "timeoutMs": 90000
+  },
+  "dmSenders": ["8:orgid:00000000-0000-4000-8000-000000000002"],
+  "groups": [
+    {
+      "id": "19:replace-with-test-group@thread.v2",
+      "senders": ["8:orgid:00000000-0000-4000-8000-000000000002"],
+      "prefix": "!claw"
+    }
+  ],
+  "pollMs": 5000,
+  "requestsPerMinute": 60,
+  "maxQueue": 1000
+}

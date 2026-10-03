@@ -1,0 +1,106 @@
+import { decodeHTML } from "entities";
+import { createHash } from "node:crypto";
+import type { Config } from "./config.js";
+export interface Message {
+  id: string;
+  arrival: number;
+  sender: string;
+  type: string;
+  text: string;
+  edited: boolean;
+  deleted: boolean;
+}
+export function normalize(raw: unknown): Message {
+  if (!raw || typeof raw !== "object") throw new Error("malformed-message");
+  const r = raw as Record<string, unknown>;
+  if (
+    typeof r.id !== "string" ||
+    !r.id ||
+    typeof r.messagetype !== "string" ||
+    typeof r.originalarrivaltime !== "string" ||
+    !Number.isFinite(Date.parse(r.originalarrivaltime))
+  )
+    throw new Error("malformed-message");
+  const system =
+    r.messagetype.startsWith("ThreadActivity/") ||
+    r.messagetype === "MessageDelete";
+  if (
+    !system &&
+    (!["Text", "RichText/Html"].includes(r.messagetype) ||
+      typeof r.from !== "string" ||
+      typeof r.content !== "string")
+  )
+    throw new Error("malformed-or-unsupported-message");
+  const props = (r.properties ?? {}) as Record<string, unknown>;
+  if (typeof props !== "object" || Array.isArray(props))
+    throw new Error("malformed-properties");
+  const sender =
+    typeof r.from === "string" ? r.from.slice(r.from.lastIndexOf("/") + 1) : "";
+  const text = system
+    ? ""
+    : decodeHTML(
+        String(r.content)
+          .replace(/<(br|\/p|\/div)\b[^>]*>/gi, "\n")
+          .replace(/<[^>]*>/g, ""),
+      ).trim();
+  return {
+    id: r.id,
+    arrival: Date.parse(r.originalarrivaltime),
+    sender,
+    type: r.messagetype,
+    text,
+    edited: Boolean(props.edittime),
+    deleted: system || Boolean(props.deletetime),
+  };
+}
+export function promptFor(
+  c: Config,
+  chat: string,
+  kind: string,
+  m: Message,
+): string | null {
+  if (m.sender === c.accountId || m.deleted || m.edited || !m.text) return null;
+  if (kind === "dm") return c.dmSenders.includes(m.sender) ? m.text : null;
+  const g = c.groups.find((g) => g.id === chat);
+  if (!g?.senders.includes(m.sender) || !m.text.startsWith(g.prefix))
+    return null;
+  return m.text.slice(g.prefix.length).trim() || null;
+}
+export function stillAllowed(
+  c: Config,
+  chat: string,
+  kind: string,
+  sender: string,
+) {
+  return kind === "dm"
+    ? c.dmSenders.includes(sender)
+    : Boolean(c.groups.find((g) => g.id === chat)?.senders.includes(sender));
+}
+export function sessionUser(
+  account: string,
+  chat: string,
+  namespace = "teams-direct",
+  epoch = 0,
+) {
+  return (
+    "teams-" +
+    createHash("sha256")
+      .update(`v1:${namespace}:${account}:${chat}:${epoch}`)
+      .digest("hex")
+  );
+}
+export function splitReply(text: string, limit: number): string[] {
+  const chars = [...text];
+  if (chars.length <= limit) return [text];
+  const payload = limit - 30;
+  const chunks: string[] = [];
+  while (chars.length) {
+    let end = Math.min(payload, chars.length);
+    const candidate = chars.slice(0, end).join("");
+    const breakAt = candidate.lastIndexOf("\n\n");
+    if (breakAt > payload / 2)
+      end = [...candidate.slice(0, breakAt + 2)].length;
+    chunks.push(chars.splice(0, end).join(""));
+  }
+  return chunks.map((s, i) => `[${i + 1}/${chunks.length}] ${s}`);
+}

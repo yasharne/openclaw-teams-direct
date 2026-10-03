@@ -1,0 +1,16 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.local.json
+state/
+browser-profile/
+credentials.json
+*.log
+__pycache__/
+*.pyc
+dist/
+*.tgz
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

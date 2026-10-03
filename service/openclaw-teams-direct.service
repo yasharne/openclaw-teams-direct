@@ -1,0 +1,27 @@
+[Unit]
+Description=Teams user-account bridge to OpenClaw
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=teams-bridge
+Group=teams-bridge
+UMask=0077
+WorkingDirectory=/opt/openclaw-teams-direct
+Environment=NODE_NO_WARNINGS=1
+ExecStart=/usr/bin/node /opt/openclaw-teams-direct/dist/src/cli.js run --config /var/lib/openclaw-teams-direct/config.local.json
+Restart=on-failure
+RestartPreventExitStatus=42
+RestartSec=10
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/openclaw-teams-direct
+
+[Install]
+WantedBy=multi-user.target

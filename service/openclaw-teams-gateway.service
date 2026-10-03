@@ -1,0 +1,21 @@
+# Install as a user service for the existing OpenClaw account.
+[Unit]
+Description=Isolated tool-free OpenClaw Gateway for Teams
+After=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+UMask=0077
+Environment=OPENCLAW_STATE_DIR=%h/.openclaw-teams-probe
+Environment=OPENCLAW_CONFIG_PATH=%h/.openclaw-teams-probe/openclaw.json
+EnvironmentFile=%h/.openclaw-teams-probe/gateway.local.env
+ExecStart=%h/.npm-global/bin/openclaw gateway --port 18790 --bind loopback
+Restart=on-failure
+RestartSec=10
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=default.target

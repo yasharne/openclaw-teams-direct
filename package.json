@@ -1,0 +1,40 @@
+{
+  "name": "openclaw-teams-direct",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Configurable Teams user-account bridge to a private OpenClaw Gateway",
+  "type": "module",
+  "engines": {
+    "node": ">=24.12"
+  },
+  "bin": {
+    "openclaw-teams-direct": "dist/src/cli.js"
+  },
+  "files": [
+    "dist/src",
+    "README.md",
+    "SECURITY.md",
+    "examples",
+    "service",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "check": "npm run lint && npm run typecheck && npm test",
+    "start": "node dist/src/cli.js",
+    "lint": "prettier --check src tests examples",
+    "format": "prettier --write src tests examples"
+  },
+  "dependencies": {
+    "entities": "4.5.0",
+    "playwright-core": "1.63.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.0",
+    "prettier": "3.6.2",
+    "typescript": "5.9.3"
+  },
+  "license": "MIT"
+}

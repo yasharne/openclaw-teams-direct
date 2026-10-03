@@ -1,0 +1,10 @@
+{
+  "name": "openclaw-teams-direct-transport-experiment",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "playwright": "1.63.0",
+    "entities": "4.5.0"
+  }
+}
