@@ -6,11 +6,11 @@ These scripts prepare a dedicated Ubuntu 24.04 account and a visible browser for
 2. Place `package.json` in `/var/lib/teams-bridge-probe/app` and install with `npm install --ignore-scripts`. This avoids optional credential-store lifecycle scripts. Build the root project first; review the resolved package and preserve the lockfile before release.
 3. As the dedicated account, run `npx playwright install chromium` from that directory.
 4. Verify the browser profile and all credential-bearing paths use directories mode 0700 and files mode 0600. The initial deployment operator explicitly waived disk encryption; file permissions do not provide encryption. Decide your own disk policy before deployment.
-5. Run `start-browser.sh` as root. It creates temporary systemd units, not boot-enabled services. Browser sandboxing is disabled for this isolated unprivileged probe; production hardening remains unresolved.
+5. Run `start-browser.sh` as root. It creates temporary systemd units, not boot-enabled services. All login components automatically expire after 30 minutes, including Chromium child processes. Set `TEAMS_LOGIN_MAX_SECONDS` (60–7200) for a different limit. A failed startup stops components already created. Browser sandboxing is disabled for this isolated unprivileged probe; production hardening remains unresolved.
 6. Forward local port 18880 to host loopback port 6080 using SSH, then visit `http://127.0.0.1:18880/vnc.html` and connect. VNC and the browser debug port must never be publicly exposed.
 7. Sign in manually. Never paste passwords or token bundles into chat, terminal logs or repository files.
 
-Stop the experiment with `sudo systemctl stop teams-probe-browser teams-probe-web teams-probe-vnc teams-probe-display`. The browser profile remains credential-bearing after shutdown; stopping processes does not remove credentials.
+Immediately after credential capture, stop the experiment with `sudo systemctl stop teams-probe-browser teams-probe-web teams-probe-vnc teams-probe-display`. The browser profile remains credential-bearing after shutdown; stopping processes does not remove credentials.
 
 Live messaging still requires a uniquely resolved authorized recipient and group. The initial candidate client was used for the first feasibility test and has been removed from production and this manifest after its dependency audit. The probes now reuse the root project's compiled browser capture; run the root build before using them. Historical tested versions and live results are recorded in compatibility.md. The persistent service implements its own bounded HTTP adapter.
 
