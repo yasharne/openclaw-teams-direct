@@ -15,6 +15,8 @@ export interface Config {
   dmSenders: string[];
   everywhereSenders: string[];
   groupPrefix: string;
+  markRead: boolean;
+  acknowledgementReaction: string;
   groups: { id: string; senders: string[]; prefix: string }[];
   pollMs: number;
   discoveryMs: number;
@@ -52,6 +54,8 @@ const known = new Set([
   "dmSenders",
   "everywhereSenders",
   "groupPrefix",
+  "markRead",
+  "acknowledgementReaction",
   "groups",
   ...Object.keys(defaults),
 ]);
@@ -78,6 +82,8 @@ export function validateConfig(raw: unknown): Config {
     namespace: "teams-direct",
     everywhereSenders: [],
     groupPrefix: "!claw",
+    markRead: false,
+    acknowledgementReaction: "",
     ...defaults,
     ...v,
   } as unknown as Config;
@@ -93,6 +99,12 @@ export function validateConfig(raw: unknown): Config {
     !Array.isArray(c.groups)
   )
     throw new Error("config-policy");
+  if (
+    typeof c.markRead !== "boolean" ||
+    typeof c.acknowledgementReaction !== "string" ||
+    !/^[a-z0-9_-]{0,64}$/.test(c.acknowledgementReaction)
+  )
+    throw new Error("config-acknowledgement");
   const groupIds = new Set();
   for (const g of c.groups) {
     keys(object(g), ["id", "senders", "prefix"]);

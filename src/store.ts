@@ -28,6 +28,7 @@ export class Store {
       CREATE TABLE IF NOT EXISTS scan_links(chat TEXT NOT NULL,link TEXT NOT NULL,PRIMARY KEY(chat,link));
       CREATE TABLE IF NOT EXISTS seen(chat TEXT NOT NULL,id TEXT NOT NULL,arrival INTEGER NOT NULL,created INTEGER NOT NULL,PRIMARY KEY(chat,id));
       CREATE TABLE IF NOT EXISTS jobs(id INTEGER PRIMARY KEY,chat TEXT NOT NULL,kind TEXT NOT NULL,message_id TEXT NOT NULL,sender TEXT NOT NULL,body TEXT,status TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,next_at INTEGER NOT NULL DEFAULT 0,created INTEGER NOT NULL,updated INTEGER NOT NULL,UNIQUE(chat,message_id));
+      CREATE TABLE IF NOT EXISTS acknowledgements(job INTEGER PRIMARY KEY REFERENCES jobs(id) ON DELETE CASCADE,client_id TEXT,read_state TEXT NOT NULL DEFAULT 'pending',reaction_state TEXT NOT NULL DEFAULT 'pending');
       CREATE INDEX IF NOT EXISTS jobs_chat_order ON jobs(chat,id,status);
       CREATE INDEX IF NOT EXISTS jobs_work ON jobs(status,next_at,chat,id);
       CREATE TABLE IF NOT EXISTS parts(job INTEGER NOT NULL REFERENCES jobs(id),part INTEGER NOT NULL,body TEXT,status TEXT NOT NULL,client_id TEXT,message_id TEXT,PRIMARY KEY(job,part));`);
@@ -118,6 +119,12 @@ export class Store {
   }
   recover() {
     this.tx(() => {
+      this.run(
+        "UPDATE acknowledgements SET read_state='uncertain' WHERE read_state='sending'",
+      );
+      this.run(
+        "UPDATE acknowledgements SET reaction_state='uncertain' WHERE reaction_state='sending'",
+      );
       this.run(
         "UPDATE chats SET reason='uncertain' WHERE id IN (SELECT chat FROM jobs WHERE status IN ('invoking','sending'))",
       );
@@ -227,7 +234,7 @@ export class Store {
         .filter((x) => x.prompt !== null);
       if (this.pending() + accepted.length > c.maxQueue) return;
       const now = Date.now();
-      for (const { m, prompt } of accepted)
+      for (const { m, prompt } of accepted) {
         this.run(
           "INSERT OR IGNORE INTO jobs(chat,kind,message_id,sender,body,status,created,updated) VALUES(?,?,?,?,?,'queued',?,?)",
           chat,
@@ -238,6 +245,15 @@ export class Store {
           now,
           now,
         );
+        this.run(
+          "INSERT OR IGNORE INTO acknowledgements(job,client_id,read_state,reaction_state) SELECT id,?,?,? FROM jobs WHERE chat=? AND message_id=?",
+          m.clientId ?? m.id,
+          c.markRead ? "pending" : "disabled",
+          c.acknowledgementReaction ? "pending" : "disabled",
+          chat,
+          m.id,
+        );
+      }
       for (const r of fresh)
         this.run(
           "INSERT OR IGNORE INTO seen VALUES(?,?,?,?)",
@@ -436,6 +452,9 @@ export class Store {
       authentication:
         this.get("SELECT value FROM meta WHERE key=?", "auth")?.value ??
         "unknown",
+      acknowledgements: this.all(
+        "SELECT read_state,reaction_state,COUNT(*) AS count FROM acknowledgements WHERE read_state!='disabled' OR reaction_state!='disabled' GROUP BY read_state,reaction_state",
+      ),
       queue: this.all(
         "SELECT status,COUNT(*) AS count,MIN(created) AS oldest FROM jobs GROUP BY status",
       ),

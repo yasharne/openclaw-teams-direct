@@ -71,12 +71,14 @@ export async function jsonRequest(
   timeout: number,
   body?: unknown,
   maxBytes = 2 * 1024 * 1024,
+  method: "GET" | "POST" | "PUT" = body ? "POST" : "GET",
+  allowEmpty = false,
 ): Promise<{ data: unknown; date: string | null }> {
   let submitted = false;
   try {
-    submitted = Boolean(body);
+    submitted = method !== "GET";
     const response = await fetch(url, {
-      method: body ? "POST" : "GET",
+      method,
       headers: {
         ...headers,
         ...(body ? { "Content-Type": "application/json" } : {}),
@@ -95,7 +97,7 @@ export async function jsonRequest(
       if (response.status === 403 || response.status === 404)
         throw new TransportError("access-denied");
       const ambiguous =
-        Boolean(body) && (response.status >= 500 || response.status === 408);
+        submitted && (response.status >= 500 || response.status === 408);
       throw new TransportError(
         ambiguous
           ? "uncertain"
@@ -106,6 +108,8 @@ export async function jsonRequest(
         ambiguous,
       );
     }
+    if (allowEmpty && response.status === 204)
+      return { data: null, date: response.headers.get("date") };
     const reader = response.body?.getReader();
     if (!reader) throw new TransportError("invalid-response", 0, submitted);
     const chunks: Uint8Array[] = [];
@@ -120,6 +124,8 @@ export async function jsonRequest(
       }
       chunks.push(value);
     }
+    if (allowEmpty && size === 0)
+      return { data: null, date: response.headers.get("date") };
     const data: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
     return { data, date: response.headers.get("date") };
   } catch (e) {
@@ -171,7 +177,13 @@ export class Teams {
       throw new TransportError("unsafe-pagination");
     return u;
   }
-  async request(relative: string, body?: unknown, pathPrefix?: string) {
+  async request(
+    relative: string,
+    body?: unknown,
+    pathPrefix?: string,
+    method: "GET" | "POST" | "PUT" = body ? "POST" : "GET",
+    allowEmpty = false,
+  ) {
     const url = this.url(relative, pathPrefix);
     return this.scheduler.run(async () => {
       try {
@@ -180,6 +192,9 @@ export class Teams {
           { Authentication: `skypetoken=${this.token.skypeToken}` },
           this.timeout,
           body,
+          undefined,
+          method,
+          allowEmpty,
         );
       } catch (e) {
         if (e instanceof TransportError && e.category === "throttled")
@@ -249,6 +264,40 @@ export class Teams {
       throw new TransportError("malformed-page");
     if (next) this.url(next, this.base.pathname + path);
     return { messages: d.messages, next };
+  }
+  async react(chat: string, message: string, reaction: string) {
+    await this.request(
+      `users/ME/conversations/${encodeURIComponent(chat)}/messages/${encodeURIComponent(message)}/properties?name=emotions`,
+      { emotions: { key: reaction, value: message } },
+      undefined,
+      "PUT",
+      true,
+    );
+  }
+  async markRead(chat: string, message: string, clientId: string) {
+    if (/[;\r\n]/.test(message + clientId))
+      throw new TransportError("invalid-read-target");
+    const current = await this.request(
+      `users/ME/conversations/${encodeURIComponent(chat)}`,
+    );
+    const horizon = (
+      current.data as { properties?: { consumptionhorizon?: unknown } }
+    )?.properties?.consumptionhorizon;
+    const previous = typeof horizon === "string" ? horizon.split(";")[0] : "";
+    if (
+      /^\d{1,20}$/.test(previous ?? "") &&
+      /^\d{1,20}$/.test(message) &&
+      BigInt(previous!) >= BigInt(message)
+    )
+      return;
+
+    await this.request(
+      `users/ME/conversations/${encodeURIComponent(chat)}/properties?name=consumptionhorizon&readReceipt=true`,
+      { consumptionhorizon: `${message};${Date.now()};${clientId}` },
+      undefined,
+      "PUT",
+      true,
+    );
   }
   async send(chat: string, text: string, clientId: string) {
     const r = await this.request(

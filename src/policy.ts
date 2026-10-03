@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { Config } from "./config.js";
 export interface Message {
   id: string;
+  clientId?: string;
   arrival: number;
   sender: string;
   type: string;
@@ -45,6 +46,9 @@ export function normalize(raw: unknown): Message {
       ).trim();
   return {
     id: r.id,
+    ...(typeof r.clientmessageid === "string"
+      ? { clientId: r.clientmessageid }
+      : {}),
     arrival: Date.parse(r.originalarrivaltime),
     sender,
     type: r.messagetype,

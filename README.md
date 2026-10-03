@@ -29,6 +29,8 @@ Replace every placeholder:
 - `dmSenders`: the allowed sender MRIs. Newly discovered DMs must have exactly the bridge user and an allowed sender.
 - `everywhereSenders`: optional sender MRIs allowed in DMs and any discovered group chat containing both the bot and an authorized sender. Defaults to an empty list. Future matching group chats are discovered automatically; channels are not included.
 - `groupPrefix`: default trigger for groups discovered through `everywhereSenders`, default `!claw`. An explicit group entry overrides this prefix.
+- `markRead`: enable read-horizon updates for accepted requests (default `false`).
+- `acknowledgementReaction`: optional Teams reaction key, default empty/disabled. Set `"think"` for 🤔 (`thinkingface` in the Teams emoji catalog).
 - `groups`: exact chat IDs, allowed sender MRIs and a required prefix; default examples use `!claw`.
 - `namespace`: a stable, unique deployment name for OpenClaw sessions.
 - `openclaw`: a loopback Chat Completions URL, an explicit agent ID and a protected local secret file containing `{"token":"YOUR_GATEWAY_TOKEN"}`. `OPENCLAW_TEAMS_GATEWAY_TOKEN` can override that secret.
@@ -81,6 +83,8 @@ node dist/src/cli.js status --config /absolute/config.local.json
 ```
 
 Replies are sent as Teams rich text. Paragraphs and line breaks are preserved; Markdown bold, inline/fenced code, headings, lists and HTTP(S) links are rendered. Raw model-generated HTML is escaped. This is a small supported Markdown subset. Explicit spacing separates sections even when Teams suppresses paragraph margins. Teams requests also carry presentation guidance: short status first, concise check bullets, separate observations, and preserved values/timestamps. Three or more metrics belong under a timestamped heading in a numbered list, with one bold label and value per line. This guidance supplements the existing agent configuration for Teams requests.
+
+When enabled, the worker reacts and marks an accepted request read when it takes the turn for processing. 🤔 acknowledges bridge acceptance, not successful agent completion. The final reply confirms the agent responded. Read horizons are cumulative within a chat and never intentionally move backward. Reaction/read writes share the Teams request budget. Auth expiry preserves the queued turn; throttling defers it. Unsupported or uncertain acknowledgements are recorded without stopping an otherwise valid agent turn, and ambiguous acknowledgements are not automatically repeated. Status includes acknowledgement states.
 
 Jobs progress through `queued → invoking → response_ready → sending → sent`. Replies and individual parts are saved before submission. Confirmed parts are not resent. Crashes/timeouts during invocation or sending mark the turn `uncertain` and pause its chat; other chats continue. Exactly-once external execution is not promised. A canceled HTTP request may already have executed tools or delivered a message.
 

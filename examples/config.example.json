@@ -21,5 +21,7 @@
   "requestsPerMinute": 60,
   "maxQueue": 1000,
   "everywhereSenders": [],
-  "groupPrefix": "!claw"
+  "groupPrefix": "!claw",
+  "markRead": false,
+  "acknowledgementReaction": ""
 }

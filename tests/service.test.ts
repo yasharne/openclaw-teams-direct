@@ -7,7 +7,7 @@ import { writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fixture, self, sender, other, group } from "./helpers.js";
 import { Store } from "../src/store.js";
-async function serviceScenario(everywhere = false) {
+async function serviceScenario(everywhere = false, acknowledgements = false) {
   const f = fixture();
   f.s.close();
   if (everywhere) {
@@ -15,6 +15,12 @@ async function serviceScenario(everywhere = false) {
     f.c.groups = [];
     f.c.everywhereSenders = [sender];
   }
+  if (acknowledgements) {
+    f.c.markRead = true;
+    f.c.acknowledgementReaction = "think";
+  }
+  const reactions: string[] = [],
+    reads: string[] = [];
   const calls: {
     user: string;
     messages: { role: string; content: string }[];
@@ -50,6 +56,24 @@ async function serviceScenario(everywhere = false) {
           choices: [{ message: { content: "synthetic reply" } }],
         }),
       );
+      return;
+    }
+    if (req.method === "PUT" && path.endsWith("/properties")) {
+      let body = "";
+      for await (const chunk of req) body += chunk;
+      const input = JSON.parse(body);
+      if (input.emotions) {
+        assert.equal(input.emotions.key, "think");
+        reactions.push(input.emotions.value);
+      } else {
+        reads.push(input.consumptionhorizon.split(";")[0]);
+      }
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+    if (req.method === "GET" && (path.endsWith(dm) || path.endsWith(group))) {
+      res.end(JSON.stringify({ properties: {} }));
       return;
     }
     if (path.endsWith("/properties")) {
@@ -140,6 +164,10 @@ async function serviceScenario(everywhere = false) {
     const [exit] = await once(child, "exit");
     assert.equal(exit, 0, output);
     assert.equal(calls.length, 2);
+    if (acknowledgements) {
+      assert.deepEqual(reactions.sort(), ["dm-new", "group-new"]);
+      assert.deepEqual(reads.sort(), ["dm-new", "group-new"]);
+    }
     assert.equal(replies.length, 2);
     assert.notEqual(calls[0]?.user, calls[1]?.user);
     assert.deepEqual(
@@ -191,3 +219,6 @@ test("actual service routes new DM/group once, denies history/self/other/untrigg
   serviceScenario());
 test("everywhere sender discovers an unlisted group and DM while denying other senders and old history", () =>
   serviceScenario(true));
+
+test("live runner acknowledges only accepted messages using PUT, empty success responses and durable state", () =>
+  serviceScenario(false, true));

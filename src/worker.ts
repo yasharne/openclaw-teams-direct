@@ -1,3 +1,4 @@
+import { acknowledge } from "./acknowledge.js";
 import type { Config } from "./config.js";
 import { Store } from "./store.js";
 import { Teams, TransportError } from "./http.js";
@@ -22,6 +23,7 @@ export async function work(
   let phase = String(job.status);
   try {
     if (phase === "queued") {
+      if (!(await acknowledge(c, store, teams, job))) return;
       store.start(id, "invoking");
       phase = "invoking";
       const response = await invokeFn(
