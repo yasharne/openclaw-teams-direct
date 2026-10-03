@@ -15,6 +15,7 @@ export interface Config {
   dmSenders: string[];
   everywhereSenders: string[];
   groupPrefix: string;
+  typingIndicator: boolean;
   markRead: boolean;
   acknowledgementReaction: string;
   groups: { id: string; senders: string[]; prefix: string }[];
@@ -54,6 +55,7 @@ const known = new Set([
   "dmSenders",
   "everywhereSenders",
   "groupPrefix",
+  "typingIndicator",
   "markRead",
   "acknowledgementReaction",
   "groups",
@@ -82,6 +84,7 @@ export function validateConfig(raw: unknown): Config {
     namespace: "teams-direct",
     everywhereSenders: [],
     groupPrefix: "!claw",
+    typingIndicator: false,
     markRead: false,
     acknowledgementReaction: "",
     ...defaults,
@@ -100,6 +103,7 @@ export function validateConfig(raw: unknown): Config {
   )
     throw new Error("config-policy");
   if (
+    typeof c.typingIndicator !== "boolean" ||
     typeof c.markRead !== "boolean" ||
     typeof c.acknowledgementReaction !== "string" ||
     !/^[a-z0-9_-]{0,64}$/.test(c.acknowledgementReaction)

@@ -29,6 +29,7 @@ Replace every placeholder:
 - `dmSenders`: the allowed sender MRIs. Newly discovered DMs must have exactly the bridge user and an allowed sender.
 - `everywhereSenders`: optional sender MRIs allowed in DMs and any discovered group chat containing both the bot and an authorized sender. Defaults to an empty list. Future matching group chats are discovered automatically; channels are not included.
 - `groupPrefix`: default trigger for groups discovered through `everywhereSenders`, default `!claw`. An explicit group entry overrides this prefix.
+- `typingIndicator`: optional boolean, default false. Refreshes Teams typing presence every four seconds while the agent generates a response, then clears it. Presence shares the request budget and is best effort; failures do not discard replies.
 - `markRead`: enable read-horizon updates for accepted requests (default `false`).
 - `acknowledgementReaction`: optional Teams reaction key, default empty/disabled. Set `"think"` for 🤔 (`thinkingface` in the Teams emoji catalog).
 - `groups`: exact chat IDs, allowed sender MRIs and a required prefix; default examples use `!claw`.

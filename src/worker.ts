@@ -1,3 +1,4 @@
+import { withTyping } from "./typing.js";
 import { acknowledge } from "./acknowledge.js";
 import type { Config } from "./config.js";
 import { Store } from "./store.js";
@@ -26,15 +27,17 @@ export async function work(
       if (!(await acknowledge(c, store, teams, job))) return;
       store.start(id, "invoking");
       phase = "invoking";
-      const response = await invokeFn(
-        c,
-        chat,
-        kind,
-        sender,
-        String(job.body),
-        Number(
-          store.get("SELECT generation FROM chats WHERE id=?", chat)
-            ?.generation ?? 0,
+      const response = await withTyping(c.typingIndicator, teams, chat, () =>
+        invokeFn(
+          c,
+          chat,
+          kind,
+          sender,
+          String(job.body),
+          Number(
+            store.get("SELECT generation FROM chats WHERE id=?", chat)
+              ?.generation ?? 0,
+          ),
         ),
       );
       store.response(id, splitReply(response, c.replyCharacters));

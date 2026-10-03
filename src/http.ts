@@ -299,6 +299,20 @@ export class Teams {
       true,
     );
   }
+  async typing(chat: string, active: boolean) {
+    await this.request(
+      `users/ME/conversations/${encodeURIComponent(chat)}/messages`,
+      {
+        content: null,
+        contenttype: "text",
+        messagetype: active ? "Control/Typing" : "Control/ClearTyping",
+        imdisplayname: this.displayName,
+      },
+      undefined,
+      "POST",
+      true,
+    );
+  }
   async send(chat: string, text: string, clientId: string) {
     const r = await this.request(
       `users/ME/conversations/${encodeURIComponent(chat)}/messages`,

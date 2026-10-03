@@ -22,6 +22,7 @@
   "maxQueue": 1000,
   "everywhereSenders": [],
   "groupPrefix": "!claw",
+  "typingIndicator": false,
   "markRead": false,
   "acknowledgementReaction": ""
 }
