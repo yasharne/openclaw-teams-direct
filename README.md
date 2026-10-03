@@ -27,6 +27,8 @@ Replace every placeholder:
 
 - `accountId`: the account's verified Teams MRI, such as `8:orgid:<UUID>`. Routing uses IDs rather than names.
 - `dmSenders`: the allowed sender MRIs. Newly discovered DMs must have exactly the bridge user and an allowed sender.
+- `everywhereSenders`: optional sender MRIs allowed in DMs and any discovered group chat containing both the bot and an authorized sender. Defaults to an empty list. Future matching group chats are discovered automatically; channels are not included.
+- `groupPrefix`: default trigger for groups discovered through `everywhereSenders`, default `!claw`. An explicit group entry overrides this prefix.
 - `groups`: exact chat IDs, allowed sender MRIs and a required prefix; default examples use `!claw`.
 - `namespace`: a stable, unique deployment name for OpenClaw sessions.
 - `openclaw`: a loopback Chat Completions URL, an explicit agent ID and a protected local secret file containing `{"token":"YOUR_GATEWAY_TOKEN"}`. `OPENCLAW_TEAMS_GATEWAY_TOKEN` can override that secret.
@@ -37,7 +39,7 @@ Unknown fields and invalid values fail validation. Use `--config /absolute/confi
 node dist/src/cli.js validate --config /absolute/config.local.json
 ```
 
-Defaults: polling 5 seconds; DM discovery 60 seconds; 60 Teams requests/minute; at most two requests in flight; two pages per chat turn; 10,000 scanned messages per chat; 1,000 queued jobs; Teams deadline 20 seconds; OpenClaw deadline 90 seconds; reply parts at most 3,000 Unicode characters. These are configurable operational limits, not Microsoft quotas. Changes to the request budget, concurrency or Teams deadline require a service restart. Access lists and group prefixes are reloaded while running. Budget saturation increases latency. Discovery, identity, member checks, paging and sends all count against the budget.
+Defaults: polling 5 seconds; DM discovery 60 seconds; 60 Teams requests/minute; at most two requests in flight; two pages per chat turn; 10,000 scanned messages per chat; 1,000 queued jobs; Teams deadline 20 seconds; OpenClaw deadline 90 seconds; reply parts at most 3,000 Unicode characters. These are configurable operational limits, not Microsoft quotas. Changes to the request budget, concurrency or Teams deadline require a service restart. Access lists and group prefixes are reloaded while running. Removing a sender from `everywhereSenders` revokes that global permission; any separate DM/group grant still applies. Budget saturation increases latency. Discovery, identity, member checks, paging and sends all count against the budget.
 
 ## Prepare OpenClaw
 

@@ -13,6 +13,8 @@ export interface Config {
     timeoutMs: number;
   };
   dmSenders: string[];
+  everywhereSenders: string[];
+  groupPrefix: string;
   groups: { id: string; senders: string[]; prefix: string }[];
   pollMs: number;
   discoveryMs: number;
@@ -48,6 +50,8 @@ const known = new Set([
   "stateDir",
   "openclaw",
   "dmSenders",
+  "everywhereSenders",
+  "groupPrefix",
   "groups",
   ...Object.keys(defaults),
 ]);
@@ -72,6 +76,8 @@ export function validateConfig(raw: unknown): Config {
   keys(v, [...known]);
   const c = {
     namespace: "teams-direct",
+    everywhereSenders: [],
+    groupPrefix: "!claw",
     ...defaults,
     ...v,
   } as unknown as Config;
@@ -79,7 +85,13 @@ export function validateConfig(raw: unknown): Config {
     throw new Error("config-namespace");
   if (c.version !== 1 || !mri(c.accountId) || !isAbsolute(c.stateDir ?? ""))
     throw new Error("config-account-or-path");
-  if (!senders(c.dmSenders) || !Array.isArray(c.groups))
+  if (
+    !senders(c.dmSenders) ||
+    !senders(c.everywhereSenders) ||
+    typeof c.groupPrefix !== "string" ||
+    !c.groupPrefix.trim() ||
+    !Array.isArray(c.groups)
+  )
     throw new Error("config-policy");
   const groupIds = new Set();
   for (const g of c.groups) {
@@ -131,6 +143,7 @@ export function validateConfig(raw: unknown): Config {
     throw new Error("config-range");
   if (
     c.dmSenders.includes(c.accountId) ||
+    c.everywhereSenders.includes(c.accountId) ||
     c.groups.some((g) => g.senders.includes(c.accountId))
   )
     throw new Error("config-self-sender");

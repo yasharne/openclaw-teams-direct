@@ -4,6 +4,7 @@ import { validateConfig } from "../src/config.js";
 import {
   normalize,
   promptFor,
+  stillAllowed,
   splitReply,
   sessionUser,
 } from "../src/policy.js";
@@ -101,4 +102,44 @@ test("session IDs separate accounts, conversations, deployments and explicit res
     sessionUser(self, "a", "teams-direct", 1),
   ])
     assert.notEqual(a, b);
+});
+
+test("everywhere access applies only to named sender in DMs and group chats, with revocation and prefix enforcement", () => {
+  const f = fixture();
+  try {
+    const chat = "19:new@thread.v2";
+    f.c.everywhereSenders = [other];
+    assert.equal(
+      promptFor(f.c, "dm", "dm", message("x", 1000, "hello", other)),
+      "hello",
+    );
+    assert.equal(
+      promptFor(f.c, chat, "group", message("x", 1000, "!claw hi", other)),
+      "hi",
+    );
+    assert.equal(
+      promptFor(f.c, chat, "group", message("x", 1000, "hi", other)),
+      null,
+    );
+    assert.equal(
+      promptFor(f.c, chat, "group", message("x", 1000, "!claw hi", sender)),
+      null,
+    );
+    assert.equal(
+      promptFor(
+        f.c,
+        "19:channel@thread.tacv2",
+        "group",
+        message("x", 1000, "!claw hi", other),
+      ),
+      null,
+    );
+    assert.equal(stillAllowed(f.c, chat, "group", other), true);
+    f.c.everywhereSenders = [];
+    assert.equal(stillAllowed(f.c, chat, "group", other), false);
+    assert.throws(() => validateConfig({ ...f.c, everywhereSenders: [self] }));
+    assert.throws(() => validateConfig({ ...f.c, everywhereSenders: ["*"] }));
+  } finally {
+    f.close();
+  }
 });

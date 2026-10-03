@@ -43,3 +43,7 @@ Teams requests now include supplemental presentation guidance: brief status, con
 ### Numbered metrics
 
 Teams presentation guidance now explicitly requests a timestamped metrics section with one bold label/value per numbered item for three or more values. All 34 tests pass locally and on EC2. An initial formatting-only response failed the numbered-layout assertion and was held back; a subsequent explicit reformatting request produced all five expected metric rows with the supplied values and timestamp preserved. Its preview was confirmed delivered and read back with ordered-list markup. Model compliance can vary; these results validate the sampled response.
+
+## Per-user access across chats
+
+Optional `everywhereSenders` grants specific MRI identities access in DMs and automatically discovered group chats containing the bot and an authorized sender. `groupPrefix` sets the default trigger; configured group prefixes override it. Channels remain excluded. Permissions are rechecked before invocation and delivery; separate explicit grants continue to apply after global revocation. All 36 tests pass locally and on EC2, including an actual runner process discovering an unlisted group and DM while rejecting history, other senders and untriggered traffic. The deployed bridge reports authenticated and ready with the operator-requested permission saved privately. No message was sent to the newly allowed person as part of this configuration change.

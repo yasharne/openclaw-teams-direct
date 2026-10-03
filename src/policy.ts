@@ -53,6 +53,16 @@ export function normalize(raw: unknown): Message {
     deleted: system || Boolean(props.deletetime),
   };
 }
+export function allowedDM(c: Config, sender: string): boolean {
+  return c.dmSenders.includes(sender) || c.everywhereSenders.includes(sender);
+}
+function globalGroupSender(c: Config, chat: string, sender: string): boolean {
+  return (
+    chat.startsWith("19:") &&
+    chat.endsWith("@thread.v2") &&
+    c.everywhereSenders.includes(sender)
+  );
+}
 export function promptFor(
   c: Config,
   chat: string,
@@ -60,11 +70,15 @@ export function promptFor(
   m: Message,
 ): string | null {
   if (m.sender === c.accountId || m.deleted || m.edited || !m.text) return null;
-  if (kind === "dm") return c.dmSenders.includes(m.sender) ? m.text : null;
+  if (kind === "dm") return allowedDM(c, m.sender) ? m.text : null;
   const g = c.groups.find((g) => g.id === chat);
-  if (!g?.senders.includes(m.sender) || !m.text.startsWith(g.prefix))
+  const prefix = g?.prefix ?? c.groupPrefix;
+  if (
+    !(g?.senders.includes(m.sender) || globalGroupSender(c, chat, m.sender)) ||
+    !m.text.startsWith(prefix)
+  )
     return null;
-  return m.text.slice(g.prefix.length).trim() || null;
+  return m.text.slice(prefix.length).trim() || null;
 }
 export function stillAllowed(
   c: Config,
@@ -73,8 +87,11 @@ export function stillAllowed(
   sender: string,
 ) {
   return kind === "dm"
-    ? c.dmSenders.includes(sender)
-    : Boolean(c.groups.find((g) => g.id === chat)?.senders.includes(sender));
+    ? allowedDM(c, sender)
+    : Boolean(
+        c.groups.find((g) => g.id === chat)?.senders.includes(sender) ||
+          globalGroupSender(c, chat, sender),
+      );
 }
 export function sessionUser(
   account: string,

@@ -19,5 +19,7 @@
   ],
   "pollMs": 5000,
   "requestsPerMinute": 60,
-  "maxQueue": 1000
+  "maxQueue": 1000,
+  "everywhereSenders": [],
+  "groupPrefix": "!claw"
 }

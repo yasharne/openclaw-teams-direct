@@ -4,7 +4,7 @@ import { loadConfig, type Config } from "./config.js";
 import { safeDirectory, protectedRead } from "./credentials.js";
 import { Scheduler, Teams, TransportError, type Token } from "./http.js";
 import { Store } from "./store.js";
-import { normalize } from "./policy.js";
+import { normalize, allowedDM } from "./policy.js";
 import { verifyGateway } from "./openclaw.js";
 import { work } from "./worker.js";
 const event = (name: string, extra: Record<string, unknown> = {}) =>
@@ -81,7 +81,11 @@ export async function run(file: string) {
       }
     }
     await verifyGateway(c);
-    event("ready", { groups: c.groups.length, dmSenders: c.dmSenders.length });
+    event("ready", {
+      groups: c.groups.length,
+      dmSenders: c.dmSenders.length,
+      everywhereSenders: c.everywhereSenders.length,
+    });
     while (!stop) {
       const fresh = await loadConfig(file, true);
       if (
@@ -139,16 +143,26 @@ export async function run(file: string) {
           for (const chat of page.conversations) {
             if (typeof chat.id !== "string" || !chat.id.startsWith("19:"))
               throw new TransportError("malformed-conversation");
+            if (store.get("SELECT id FROM chats WHERE id=?", chat.id)) continue;
+            const isGroup = chat.id.endsWith("@thread.v2");
             if (
-              !chat.id.endsWith("@unq.gbl.spaces") ||
-              store.get("SELECT id FROM chats WHERE id=?", chat.id)
+              !chat.id.endsWith("@unq.gbl.spaces") &&
+              !(isGroup && c.everywhereSenders.length)
             )
               continue;
             const members = await teams.members(chat.id);
+            if (isGroup) {
+              if (
+                members.some((m) => m.id === c.accountId) &&
+                members.some((m) => c.everywhereSenders.includes(m.id))
+              )
+                store.addChat(chat.id, "group", Number(discoveryCutoff));
+              continue;
+            }
             if (
               members.length !== 2 ||
               !members.some((m) => m.id === c.accountId) ||
-              !members.some((m) => c.dmSenders.includes(m.id))
+              !members.some((m) => allowedDM(c, m.id))
             )
               continue;
             store.addChat(chat.id, "dm", Number(discoveryCutoff));
@@ -178,7 +192,13 @@ export async function run(file: string) {
       }
       const eligible = store
         .all("SELECT * FROM chats WHERE reason IS NULL ORDER BY id")
-        .filter((r) => r.kind === "dm" || c.groups.some((g) => g.id === r.id));
+        .filter(
+          (r) =>
+            r.kind === "dm" ||
+            c.groups.some((g) => g.id === r.id) ||
+            (c.everywhereSenders.length > 0 &&
+              String(r.id).endsWith("@thread.v2")),
+        );
       if (eligible.length && store.pending() < c.maxQueue) {
         const chat = eligible[pollIndex++ % eligible.length]!;
         const id = String(chat.id);

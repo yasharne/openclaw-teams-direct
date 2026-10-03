@@ -7,9 +7,14 @@ import { writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fixture, self, sender, other, group } from "./helpers.js";
 import { Store } from "../src/store.js";
-test("actual service routes new DM/group once, denies history/self/other/untriggered messages and shuts down cleanly", async () => {
+async function serviceScenario(everywhere = false) {
   const f = fixture();
   f.s.close();
+  if (everywhere) {
+    f.c.dmSenders = [];
+    f.c.groups = [];
+    f.c.everywhereSenders = [sender];
+  }
   const calls: {
     user: string;
     messages: { role: string; content: string }[];
@@ -181,4 +186,8 @@ test("actual service routes new DM/group once, denies history/self/other/untrigg
     await new Promise<void>((r) => server.close(() => r()));
     await rm(f.dir, { recursive: true, force: true });
   }
-});
+}
+test("actual service routes new DM/group once, denies history/self/other/untriggered messages and shuts down cleanly", () =>
+  serviceScenario());
+test("everywhere sender discovers an unlisted group and DM while denying other senders and old history", () =>
+  serviceScenario(true));
