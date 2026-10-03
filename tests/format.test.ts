@@ -10,7 +10,7 @@ test("Teams rich text preserves the incident summary's paragraphs, bold, bullets
   );
   assert.ok(html.includes("<ul><li><strong>Incident wrapper:</strong>"));
   assert.ok(html.includes("<code>false</code>"));
-  assert.ok(html.endsWith("</ul><p>Baly is running normally.</p>"));
+  assert.ok(html.endsWith("</ul><br><p>Baly is running normally.</p>"));
 });
 test("Model HTML is escaped and links cannot introduce scripts or attributes", () => {
   const html = formatReply(
@@ -28,4 +28,11 @@ test("Code blocks, ordered lists and single line breaks remain readable", () => 
   assert.ok(html.includes("<p>first<br>second</p>"));
   assert.ok(html.includes("<ol><li>one</li><li>two</li></ol>"));
   assert.ok(html.includes("<pre><code>&lt;raw&gt; **literal**</code></pre>"));
+});
+
+test("Teams section spacing does not depend on paragraph margins", () => {
+  assert.equal(
+    formatReply("**Status**\n\nChecks\n- Healthy\n\nMonitoring"),
+    "<p><strong>Status</strong></p><br><p>Checks</p><br><ul><li>Healthy</li></ul><br><p>Monitoring</p>",
+  );
 });

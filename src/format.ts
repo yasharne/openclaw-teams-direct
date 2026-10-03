@@ -83,5 +83,6 @@ export function formatReply(markdown: string): string {
   flushParagraph();
   flushList();
   if (code) blocks.push(`<pre><code>${escape(code.join("\n"))}</code></pre>`);
-  return blocks.join("");
+  // Teams suppresses paragraph margins; explicit breaks keep sections apart.
+  return blocks.join("<br>");
 }

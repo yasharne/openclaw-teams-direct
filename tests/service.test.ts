@@ -10,7 +10,10 @@ import { Store } from "../src/store.js";
 test("actual service routes new DM/group once, denies history/self/other/untriggered messages and shuts down cleanly", async () => {
   const f = fixture();
   f.s.close();
-  const calls: { user: string; messages: { content: string }[] }[] = [];
+  const calls: {
+    user: string;
+    messages: { role: string; content: string }[];
+  }[] = [];
   const replies: string[] = [];
   const anchor = Math.floor(Date.now() / 1000) * 1000;
   let child: ReturnType<typeof spawn> | undefined;
@@ -135,11 +138,28 @@ test("actual service routes new DM/group once, denies history/self/other/untrigg
     assert.equal(replies.length, 2);
     assert.notEqual(calls[0]?.user, calls[1]?.user);
     assert.deepEqual(
-      calls.map((c) => JSON.parse(c.messages[0]!.content).text).sort(),
+      calls
+        .map(
+          (c) =>
+            JSON.parse(c.messages.find((m) => m.role === "user")!.content).text,
+        )
+        .sort(),
       ["DM live", "GROUP live"],
     );
     assert.ok(
-      calls.every((c) => JSON.parse(c.messages[0]!.content).sender === sender),
+      calls.every((c) =>
+        c.messages.some(
+          (m) =>
+            m.role === "system" && m.content.includes("Preserve exact values"),
+        ),
+      ),
+    );
+    assert.ok(
+      calls.every(
+        (c) =>
+          JSON.parse(c.messages.find((m) => m.role === "user")!.content)
+            .sender === sender,
+      ),
     );
     assert.ok(!output.includes("synthetic-token"));
     const s = new Store(f.file, self);

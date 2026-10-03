@@ -78,7 +78,7 @@ Authentication expiry stops with status `needs-login` and exit code 42 while ret
 node dist/src/cli.js status --config /absolute/config.local.json
 ```
 
-Replies are sent as Teams rich text. Paragraphs and line breaks are preserved; Markdown bold, inline/fenced code, headings, lists and HTTP(S) links are rendered. Raw model-generated HTML is escaped. This is a small supported Markdown subset.
+Replies are sent as Teams rich text. Paragraphs and line breaks are preserved; Markdown bold, inline/fenced code, headings, lists and HTTP(S) links are rendered. Raw model-generated HTML is escaped. This is a small supported Markdown subset. Explicit spacing separates sections even when Teams suppresses paragraph margins. Teams requests also carry presentation guidance: short status first, concise check/metric bullets, separate observations, and preserved values/timestamps. This guidance supplements the existing agent configuration for Teams requests.
 
 Jobs progress through `queued → invoking → response_ready → sending → sent`. Replies and individual parts are saved before submission. Confirmed parts are not resent. Crashes/timeouts during invocation or sending mark the turn `uncertain` and pause its chat; other chats continue. Exactly-once external execution is not promised. A canceled HTTP request may already have executed tools or delivered a message.
 

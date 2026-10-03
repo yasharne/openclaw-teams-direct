@@ -2,6 +2,12 @@ import { jsonRequest, TransportError } from "./http.js";
 import { protectedRead } from "./credentials.js";
 import { sessionUser } from "./policy.js";
 import type { Config } from "./config.js";
+export const teamsPresentation = [
+  "Format this response for a Microsoft Teams chat using Markdown, never raw HTML.",
+  "Keep simple answers short. For reports or operational status, lead with a short bold status line, then use blank lines and concise bullets for separate checks or findings.",
+  "Put metrics in their own section with one metric per bullet when there are several values. Put caveats, anomalies, and follow-up actions in a separate section; avoid a dense paragraph combining all of them.",
+  "Preserve exact values, units, timestamps and uncertainty. Do not invent facts, health assessments or actions to fill a template. Avoid tables and nested lists; use inline code for identifiers and code blocks for commands.",
+].join("\n");
 export async function invoke(
   c: Config,
   chat: string,
@@ -24,6 +30,7 @@ export async function invoke(
       user: sessionUser(c.accountId, chat, c.namespace, epoch),
       stream: false,
       messages: [
+        { role: "system", content: teamsPresentation },
         {
           role: "user",
           content: JSON.stringify({ sender, chatType: kind, text }),

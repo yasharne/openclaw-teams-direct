@@ -35,3 +35,7 @@ The bridge was stopped before migration. An idle SQLite snapshot preserved chat 
 ## Reply formatting (2026-10-03)
 
 Production sends now use `RichText/Html` with escaped content and a small Markdown renderer. A one-time preview delivered to the authorized test DM was read back from Teams as rich text with paragraphs, bold and bullet markup intact. All 33 tests pass locally and on the EC2 Node 24 host, including the actual service HTTP payload assertion and HTML-escaping cases. The bridge remains active. Existing messages are not edited.
+
+### Report layout follow-up
+
+Teams requests now include supplemental presentation guidance: brief status, concise separate check/metric bullets, blank sections and distinct caveats, preserving values and uncertainty. Explicit breaks between HTML blocks address Teams paragraph-margin suppression. Installed endpoint source confirms system messages are passed as supplemental agent instructions. A real main-agent formatting-only test produced seven bullets and preserved every checked value and timestamp from the supplied report; its preview was confirmed delivered as rich text in the authorized DM. All 34 tests pass locally and on EC2. This verifies the sampled report, not a guarantee of identical model formatting on every turn.
