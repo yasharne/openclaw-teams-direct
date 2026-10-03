@@ -67,7 +67,8 @@ test("actual service routes new DM/group once, denies history/self/other/untrigg
       let body = "";
       for await (const chunk of req) body += chunk;
       const input = JSON.parse(body);
-      assert.equal(input.content, "synthetic reply");
+      assert.equal(input.content, "<p>synthetic reply</p>");
+      assert.equal(input.messagetype, "RichText/Html");
       assert.ok(input.clientmessageid);
       assert.equal(input.imdisplayname, "Synthetic Bridge");
       replies.push(path);

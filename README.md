@@ -78,6 +78,8 @@ Authentication expiry stops with status `needs-login` and exit code 42 while ret
 node dist/src/cli.js status --config /absolute/config.local.json
 ```
 
+Replies are sent as Teams rich text. Paragraphs and line breaks are preserved; Markdown bold, inline/fenced code, headings, lists and HTTP(S) links are rendered. Raw model-generated HTML is escaped. This is a small supported Markdown subset.
+
 Jobs progress through `queued → invoking → response_ready → sending → sent`. Replies and individual parts are saved before submission. Confirmed parts are not resent. Crashes/timeouts during invocation or sending mark the turn `uncertain` and pause its chat; other chats continue. Exactly-once external execution is not promised. A canceled HTTP request may already have executed tools or delivered a message.
 
 Stop the bridge before operator mutations:

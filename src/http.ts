@@ -254,8 +254,8 @@ export class Teams {
     const r = await this.request(
       `users/ME/conversations/${encodeURIComponent(chat)}/messages`,
       {
-        content: text,
-        messagetype: "Text",
+        content: formatReply(text),
+        messagetype: "RichText/Html",
         contenttype: "text",
         clientmessageid: clientId,
         imdisplayname: this.displayName,
@@ -280,3 +280,4 @@ function metadataNext(data: unknown): string | null {
     throw new TransportError("malformed-page");
   return next;
 }
+import { formatReply } from "./format.js";
