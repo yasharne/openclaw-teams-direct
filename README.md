@@ -4,7 +4,7 @@ Connect Microsoft Teams text chats to a private OpenClaw Gateway using an existi
 
 This uses an unofficial Teams client transport. It is not a Microsoft-supported bot integration. Interactive sign-in and your tenant's MFA or Conditional Access still apply; a username and password do not guarantee unattended access. Verify organizational permission to use the account this way.
 
-The first live experiment passed DM and group round trips with OpenClaw 2026.9.6. The deployed persistent service also passed fresh DM and group delivery and a service restart; see [compatibility](docs/compatibility.md). Automatic renewal and overnight reliability are not established. Mention triggers, channels, files, voice, Docker and npm publication are not included in this release.
+The first live experiment passed DM and group round trips with OpenClaw 2026.9.6. The deployed persistent service also passed fresh DM and group delivery and a service restart; see [compatibility](docs/compatibility.md). Optional saved-session renewal is available; unattended operation remains dependent on Microsoft sign-in policy. Mention triggers, channels, files, voice, Docker and npm publication are not included in this release.
 
 ## Install
 
@@ -73,7 +73,7 @@ node dist/src/cli.js run --config /absolute/config.local.json
 
 On initial activation of a chat, messages older than its persisted service-clock cutoff are ignored. Send a fresh message after the service is ready. On restart the same cursor resumes. Edits, deleted messages, system events, self messages, unauthorized senders and unprefixed group traffic do not invoke OpenClaw. Unexpected malformed records pause the affected chat without advancing its cursor.
 
-Authentication expiry stops with status `needs-login` and exit code 42 while retaining queued work. Sign in again, capture the session and restart the service. It never loops through password or MFA prompts in the background.
+Authentication expiry stops with status `needs-login` and exit code 42 while retaining queued work. The optional renewal timer can recover this using a saved browser session. If Microsoft requires interactive sign-in, sign in again, capture the session and restart the service. It never fills password or MFA prompts in the background.
 
 ## Run and recover
 
@@ -103,6 +103,22 @@ node dist/src/cli.js purge --config /absolute/config.local.json
 `retry` explicitly accepts possible duplicate tool execution or messages. It reuses a saved reply when one exists. `resume` discards an incomplete scan while preserving its cursor; resolve failed/uncertain/expired jobs first. `reset-session` requires no pending turns and starts a new OpenClaw conversation generation. Use it before expanding group membership when previous context should not be shared. `purge` deletes saved payloads and pauses unfinished work for resolution.
 
 Completed/canceled/failed payloads expire after 24 hours; queued and uncertain payloads expire after seven days and require resolution. Dedup records below the cursor expire after 30 days; cursor-boundary IDs remain to prevent equal-timestamp replay. Logs report categories and counts without message bodies or raw transport errors. SQLite deletion and checkpointing do not guarantee forensic erasure from storage or backups.
+
+## Automatic saved-session renewal
+
+Install and customize [renewal service](service/openclaw-teams-renew.service) and [timer](service/openclaw-teams-renew.timer) alongside the bridge. Set the user and installation paths, and create a private `renewal.env` containing absolute paths:
+
+```text
+TEAMS_CONFIG=/var/lib/openclaw-teams-direct/config.local.json
+TEAMS_PROFILE=/var/lib/openclaw-teams-direct/browser-profile
+TEAMS_BROWSER=/absolute/path/to/chrome
+```
+
+Use the existing dedicated Teams browser profile (directory mode 0700, owned by the service account). Adjust the unit's writable paths to include that profile and state directory. Enable with `systemctl enable --now openclaw-teams-renew.timer` and run `systemctl start openclaw-teams-renew.service` for an immediate check. Review results with `journalctl -u openclaw-teams-renew.service`. A successful check starts an expired/stopped bridge; it leaves a running bridge running.
+
+Checks run every ten minutes. A valid token more than thirty minutes from expiry needs no browser; opaque tokens use a six-hour age threshold. The expiry claim is only a scheduling hint: account identity is always verified with Teams. Expired credentials also trigger renewal. Renewal opens a short-lived headless Chromium session, observes ordinary Teams authentication requests, verifies the configured account, and atomically replaces the protected credential file. The running bridge adopts it between requests, preserving conversations, cursors and pending replies. No password is stored for renewal.
+
+The browser closes after success or failure; the systemd unit additionally kills its process group after three minutes and caps memory at 900 MB. Close the interactive login browser before automatic renewal, as Chromium profiles cannot be shared concurrently. For manual sign-in, stop the renewal timer first and start it again after closing the login browser. Password/MFA requirements or revoked sessions can still require manual login; failures appear in the renewal unit journal and leave existing credentials intact. To test capture immediately, run `node dist/src/cli.js renew --config /absolute/config.local.json --profile /absolute/profile --browser /absolute/chrome --force` as the service account with the browser closed.
 
 ## Development and distribution
 

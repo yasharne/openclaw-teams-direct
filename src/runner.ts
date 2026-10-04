@@ -60,10 +60,11 @@ export async function run(file: string) {
     nextDiscovery = 0,
     lastCleanup = 0;
   try {
-    const token = (await protectedRead(
-      join(c.stateDir, "credentials.json"),
-    )) as Token;
-    const teams = new Teams(token, scheduler, c.requestTimeoutMs);
+    const credentialFile = join(c.stateDir, "credentials.json");
+    let credentialStamp = (await lstat(credentialFile)).mtimeMs;
+    const token = (await protectedRead(credentialFile)) as Token;
+    let teams = new Teams(token, scheduler, c.requestTimeoutMs);
+    let nextCredentialCheck = 0;
     const identity = await teams.identity();
     if (identity.id !== c.accountId) throw new Error("login-account-mismatch");
     const cutoff = Date.parse(identity.date ?? "");
@@ -87,6 +88,22 @@ export async function run(file: string) {
       everywhereSenders: c.everywhereSenders.length,
     });
     while (!stop) {
+      if (Date.now() >= nextCredentialCheck) {
+        nextCredentialCheck = Date.now() + 5000;
+        const stamp = (await lstat(credentialFile)).mtimeMs;
+        if (stamp !== credentialStamp) {
+          const replacement = new Teams(
+            (await protectedRead(credentialFile)) as Token,
+            scheduler,
+            c.requestTimeoutMs,
+          );
+          if ((await replacement.identity()).id !== c.accountId)
+            throw Error("login-account-mismatch");
+          teams = replacement;
+          credentialStamp = stamp;
+          event("credentials-reloaded");
+        }
+      }
       const fresh = await loadConfig(file, true);
       if (
         fresh.namespace !== c.namespace ||

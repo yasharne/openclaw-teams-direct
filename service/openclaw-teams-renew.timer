@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Teams bridge login every ten minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=10min
+RandomizedDelaySec=30
+Unit=openclaw-teams-renew.service
+
+[Install]
+WantedBy=timers.target

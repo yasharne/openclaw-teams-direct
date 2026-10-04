@@ -7,7 +7,11 @@ import { writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { fixture, self, sender, other, group } from "./helpers.js";
 import { Store } from "../src/store.js";
-async function serviceScenario(everywhere = false, acknowledgements = false) {
+async function serviceScenario(
+  everywhere = false,
+  acknowledgements = false,
+  rotate = false,
+) {
   const f = fixture();
   f.s.close();
   if (everywhere) {
@@ -26,6 +30,7 @@ async function serviceScenario(everywhere = false, acknowledgements = false) {
     messages: { role: string; content: string }[];
   }[] = [];
   const replies: string[] = [];
+  let rotatedRequests = 0;
   const anchor = Math.floor(Date.now() / 1000) * 1000;
   let child: ReturnType<typeof spawn> | undefined;
   const raw = (id: string, text: string, from: string, at = anchor + 5000) => ({
@@ -37,6 +42,8 @@ async function serviceScenario(everywhere = false, acknowledgements = false) {
   });
   const dm = "19:synthetic@unq.gbl.spaces";
   const server = createServer(async (req, res) => {
+    if (req.headers.authentication === "skypetoken=rotated-token")
+      rotatedRequests++;
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Date", new Date(anchor).toUTCString());
     const path = decodeURIComponent(
@@ -107,7 +114,15 @@ async function serviceScenario(everywhere = false, acknowledgements = false) {
       res.end(
         JSON.stringify({ OriginalArrivalTime: Date.now() + replies.length }),
       );
-      if (replies.length === 2) setTimeout(() => child?.kill("SIGINT"), 50);
+      if (replies.length === 2) {
+        if (rotate)
+          await writeFile(
+            join(f.dir, "credentials.json"),
+            JSON.stringify({ region: "apac", skypeToken: "rotated-token" }),
+            { mode: 0o600 },
+          );
+        setTimeout(() => child?.kill("SIGINT"), rotate ? 6500 : 50);
+      }
       return;
     }
     if (path.endsWith("/messages")) {
@@ -164,6 +179,10 @@ async function serviceScenario(everywhere = false, acknowledgements = false) {
     const [exit] = await once(child, "exit");
     assert.equal(exit, 0, output);
     assert.equal(calls.length, 2);
+    if (rotate) {
+      assert.ok(rotatedRequests > 0, output);
+      assert.match(output, /credentials-reloaded/);
+    }
     if (acknowledgements) {
       assert.deepEqual(reactions.sort(), ["dm-new", "group-new"]);
       assert.deepEqual(reads.sort(), ["dm-new", "group-new"]);
@@ -222,3 +241,6 @@ test("everywhere sender discovers an unlisted group and DM while denying other s
 
 test("live runner acknowledges only accepted messages using PUT, empty success responses and durable state", () =>
   serviceScenario(false, true));
+
+test("running bridge adopts rotated verified credentials without restart or duplicate turns", () =>
+  serviceScenario(false, false, true));

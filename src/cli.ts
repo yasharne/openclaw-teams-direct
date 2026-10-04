@@ -11,6 +11,9 @@ const args = parseArgs({
   options: {
     config: { type: "string" },
     "accept-duplicate-risk": { type: "boolean" },
+    profile: { type: "string" },
+    browser: { type: "string" },
+    force: { type: "boolean" },
     port: { type: "string", default: "9222" },
   },
 });
@@ -18,7 +21,7 @@ const [command, ...rest] = args.positionals;
 async function main() {
   if (!command || command === "help") {
     console.log(
-      "Usage: openclaw-teams-direct <validate|identity|login|run|status|chats|members|resolve|resume|purge|reset-session> --config /absolute/config.local.json\nresolve JOB_ID complete|cancel|retry [--accept-duplicate-risk]\nresume CHAT_ID: reset a failed scan without advancing its cursor\npurge: remove saved payloads and pause pending chats\nreset-session CHAT_ID: start new OpenClaw context when that chat has no pending jobs",
+      "Usage: openclaw-teams-direct <validate|identity|login|renew|run|status|chats|members|resolve|resume|purge|reset-session> --config /absolute/config.local.json\nresolve JOB_ID complete|cancel|retry [--accept-duplicate-risk]\nresume CHAT_ID: reset a failed scan without advancing its cursor\npurge: remove saved payloads and pause pending chats\nreset-session CHAT_ID: start new OpenClaw context when that chat has no pending jobs",
     );
     return;
   }
@@ -32,6 +35,22 @@ async function main() {
   await safeDirectory(c.stateDir, true);
   if (command === "run") {
     await run(file);
+    return;
+  }
+  if (command === "renew") {
+    if (!args.values.profile || !args.values.browser)
+      throw Error("renewal-profile-and-browser-required");
+    const { renewCredentials } = await import("./renew.js");
+    console.log(
+      JSON.stringify(
+        await renewCredentials(
+          c,
+          args.values.profile,
+          args.values.browser,
+          args.values.force,
+        ),
+      ),
+    );
     return;
   }
   if (command === "identity") {

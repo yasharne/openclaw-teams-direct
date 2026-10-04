@@ -1,0 +1,26 @@
+[Unit]
+Description=Renew Teams bridge credentials from saved browser session
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=teams-bridge
+Group=teams-bridge
+UMask=0077
+WorkingDirectory=/opt/openclaw-teams-direct
+Environment=NODE_NO_WARNINGS=1
+EnvironmentFile=/var/lib/openclaw-teams-direct/renewal.env
+ExecStart=/usr/bin/node /opt/openclaw-teams-direct/dist/src/cli.js renew --config ${TEAMS_CONFIG} --profile ${TEAMS_PROFILE} --browser ${TEAMS_BROWSER}
+# Start is a no-op for a running bridge; it recovers a bridge stopped by expiry.
+ExecStartPost=+/usr/bin/systemctl start openclaw-teams-direct.service
+TimeoutStartSec=180
+TimeoutStopSec=15
+KillMode=control-group
+MemoryMax=900M
+TasksMax=256
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/openclaw-teams-direct
