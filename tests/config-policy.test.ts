@@ -24,6 +24,11 @@ test("configuration rejects unknown fields, nonlocal Gateway, self authorization
       { ...f.c, dmSenders: [self] },
       { ...f.c, maxInFlight: 3 },
       { ...f.c, requestsPerMinute: 0 },
+      { ...f.c, commandInstructions: null },
+      { ...f.c, commandInstructions: { "/report status": "" } },
+      { ...f.c, commandInstructions: { "report status": "run report" } },
+      { ...f.c, commandInstructions: { "/Report": "run report" } },
+      { ...f.c, commandInstructions: { "/report": "x".repeat(4001) } },
     ])
       assert.throws(() => validateConfig(c));
     assert.equal(f.c.openclaw.timeoutMs, 90000);

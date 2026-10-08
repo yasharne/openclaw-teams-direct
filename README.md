@@ -151,3 +151,7 @@ npm pack --dry-run
 Tests use synthetic identities, temporary real SQLite, real local HTTP endpoints and process crash injection. Live tenant tests are explicit and separate. Package contents are allowlisted. The package remains private to prevent accidental npm publication; no release workflow uploads tenant credentials. Source is published under the MIT license on GitHub.
 
 See [engineering design](docs/design.md), [review](docs/engineering-review.md), [test plan](docs/engineering-test-plan.md), [security](SECURITY.md) and [contributing](CONTRIBUTING.md).
+
+### Explicit command routing
+
+If similarly named skills cause a slash command to run the wrong skill, configure an optional `commandInstructions` object. Keys match the entire accepted command after trimming and lowercasing; values are operator instructions appended to that current agent turn. For example, `{"/report status": "Read the report skill instructions and run its status command; use its documented Teams image export option."}`. This preserves the existing chat session and authorization rules. Keep deployment-specific skill names and paths in your protected local configuration.

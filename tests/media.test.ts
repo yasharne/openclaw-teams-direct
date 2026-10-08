@@ -106,6 +106,10 @@ test("image turn downloads authorized AMS bytes, passes OpenClaw image parts, pe
       invokes++;
       const input = JSON.parse(body.toString());
       assert.equal(
+        JSON.parse(input.messages[1].content[0].text).text,
+        "/REPORT STATUS\n\nRead the report skill and export its chart for Teams.",
+      );
+      assert.equal(
         input.messages[1].content[1].image_url.url,
         `data:image/png;base64,${png.toString("base64")}`,
       );
@@ -160,6 +164,9 @@ test("image turn downloads authorized AMS bytes, passes OpenClaw image parts, pe
       return original(url, init);
     };
     f.c.media.enabled = true;
+    f.c.commandInstructions = {
+      "/report status": "Read the report skill and export its chart for Teams.",
+    };
     f.c.media.outboundRoots = [join(f.dir, "outbox")];
     await mkdir(f.c.media.outboundRoots[0]!);
     const output = join(f.dir, "outbox", "result.png");
@@ -172,7 +179,7 @@ test("image turn downloads authorized AMS bytes, passes OpenClaw image parts, pe
     );
     enqueue(f, group, "group", {
       ...message("image"),
-      text: "!claw What is in this image?",
+      text: "!claw /REPORT STATUS",
       images: ["incoming-id"],
     });
     const teams = new Teams(

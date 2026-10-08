@@ -15,6 +15,7 @@ export interface Config {
   dmSenders: string[];
   everywhereSenders: string[];
   groupPrefix: string;
+  commandInstructions: Record<string, string>;
   media: {
     enabled: boolean;
     maxImageBytes: number;
@@ -61,6 +62,7 @@ const known = new Set([
   "dmSenders",
   "everywhereSenders",
   "groupPrefix",
+  "commandInstructions",
   "media",
   "typingIndicator",
   "markRead",
@@ -91,6 +93,7 @@ export function validateConfig(raw: unknown): Config {
     namespace: "teams-direct",
     everywhereSenders: [],
     groupPrefix: "!claw",
+    commandInstructions: {},
     media: {
       enabled: false,
       maxImageBytes: 5242880,
@@ -122,6 +125,19 @@ export function validateConfig(raw: unknown): Config {
     !/^[a-z0-9_-]{0,64}$/.test(c.acknowledgementReaction)
   )
     throw new Error("config-acknowledgement");
+  const commands = object(c.commandInstructions);
+  if (
+    Object.keys(commands).length > 64 ||
+    Object.entries(commands).some(
+      ([command, instruction]) =>
+        !/^\/[a-z0-9][a-z0-9 _-]{0,126}$/.test(command) ||
+        command !== command.trim() ||
+        typeof instruction !== "string" ||
+        !instruction.trim() ||
+        instruction.length > 4000,
+    )
+  )
+    throw new Error("config-command-instructions");
   keys(object(c.media), [
     "enabled",
     "maxImageBytes",

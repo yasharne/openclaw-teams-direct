@@ -23,6 +23,10 @@ export async function invoke(
     ((await protectedRead(c.openclaw.secretFile)) as { token?: string }).token;
   if (typeof token !== "string" || !token)
     throw new TransportError("invalid-gateway-secret");
+  const commandInstruction = c.commandInstructions[text.trim().toLowerCase()];
+  const userText = commandInstruction
+    ? text + "\n\n" + commandInstruction
+    : text;
   const r = await jsonRequest(
     new URL(c.openclaw.url),
     { Authorization: `Bearer ${token}` },
@@ -51,14 +55,18 @@ export async function invoke(
             ? [
                 {
                   type: "text",
-                  text: JSON.stringify({ sender, chatType: kind, text }),
+                  text: JSON.stringify({
+                    sender,
+                    chatType: kind,
+                    text: userText,
+                  }),
                 },
                 ...images.map((url) => ({
                   type: "image_url",
                   image_url: { url },
                 })),
               ]
-            : JSON.stringify({ sender, chatType: kind, text }),
+            : JSON.stringify({ sender, chatType: kind, text: userText }),
         },
       ],
     },
