@@ -16,6 +16,11 @@ export interface Config {
   everywhereSenders: string[];
   groupPrefix: string;
   commandInstructions: Record<string, string>;
+  outbound: {
+    enabled: boolean;
+    socketPath: string;
+    targets: Record<string, string>;
+  };
   media: {
     enabled: boolean;
     maxImageBytes: number;
@@ -63,6 +68,7 @@ const known = new Set([
   "everywhereSenders",
   "groupPrefix",
   "commandInstructions",
+  "outbound",
   "media",
   "typingIndicator",
   "markRead",
@@ -94,6 +100,7 @@ export function validateConfig(raw: unknown): Config {
     everywhereSenders: [],
     groupPrefix: "!claw",
     commandInstructions: {},
+    outbound: { enabled: false, socketPath: "", targets: {} },
     media: {
       enabled: false,
       maxImageBytes: 5242880,
@@ -125,6 +132,21 @@ export function validateConfig(raw: unknown): Config {
     !/^[a-z0-9_-]{0,64}$/.test(c.acknowledgementReaction)
   )
     throw new Error("config-acknowledgement");
+  keys(object(c.outbound), ["enabled", "socketPath", "targets"]);
+  if (
+    typeof c.outbound.enabled !== "boolean" ||
+    typeof c.outbound.socketPath !== "string" ||
+    (c.outbound.enabled && !isAbsolute(c.outbound.socketPath)) ||
+    Object.entries(object(c.outbound.targets)).some(
+      ([alias, id]) =>
+        !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(alias) ||
+        typeof id !== "string" ||
+        !/^19:[a-zA-Z0-9_.:-]{1,250}@(thread\.v2|thread\.tacv2|thread\.skype|unq\.gbl\.spaces)$/.test(
+          id,
+        ),
+    )
+  )
+    throw Error("config-outbound");
   const commands = object(c.commandInstructions);
   if (
     Object.keys(commands).length > 64 ||

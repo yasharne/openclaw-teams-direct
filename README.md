@@ -4,7 +4,7 @@ Connect Microsoft Teams text chats to a private OpenClaw Gateway using an existi
 
 This uses an unofficial Teams client transport. It is not a Microsoft-supported bot integration. Interactive sign-in and your tenant's MFA or Conditional Access still apply; a username and password do not guarantee unattended access. Verify organizational permission to use the account this way.
 
-The first live experiment passed DM and group round trips with OpenClaw 2026.9.6. The deployed persistent service also passed fresh DM and group delivery and a service restart; see [compatibility](docs/compatibility.md). Optional saved-session renewal is available; unattended operation remains dependent on Microsoft sign-in policy. Mention triggers, channels, files, voice, Docker and npm publication are not included in this release.
+The first live experiment passed DM and group round trips with OpenClaw 2026.9.6. The deployed persistent service also passed fresh DM and group delivery and a service restart; see [compatibility](docs/compatibility.md). Optional saved-session renewal is available; unattended operation remains dependent on Microsoft sign-in policy. Mention triggers, incoming channel monitoring, general file attachments, voice, Docker and npm publication are not included in this release.
 
 ## Install
 
@@ -155,3 +155,32 @@ See [engineering design](docs/design.md), [review](docs/engineering-review.md), 
 ### Explicit command routing
 
 If similarly named skills cause a slash command to run the wrong skill, configure an optional `commandInstructions` object. Keys match the entire accepted command after trimming and lowercasing; values are operator instructions appended to that current agent turn. For example, `{"/report status": "Read the report skill instructions and run its status command; use its documented Teams image export option."}`. This preserves the existing chat session and authorization rules. Keep deployment-specific skill names and paths in your protected local configuration.
+
+### Scheduled and skill-originated delivery
+
+Enable a local Unix-socket outbox and map destination aliases to exact Teams thread IDs:
+
+```json
+"outbound": {
+  "enabled": true,
+  "socketPath": "/var/lib/openclaw-teams-direct/outbound.sock",
+  "targets": {
+    "report": "19:REPLACE_WITH_CHAT_ID@thread.v2"
+  }
+}
+```
+
+The socket accepts local `POST /send` requests only. It exposes no network listener or Teams credentials. Its parent must be a real directory owned by the bridge account with no group/other write permission. The socket uses mode `0660`. When the OpenClaw user differs from the bridge user, prepare a shared socket directory owned by the bridge, with the OpenClaw user's group and mode `2750`, and add that directory to the service's `ReadWritePaths`. Authorized local group members can submit results to configured targets. Restart the service after enabling or changing the socket path; target changes take effect between turns.
+
+```bash
+openclaw-teams-send --socket /absolute/outbound.sock --target report \
+  --id report-job:2026-10-08T12:00:00Z --text 'Scheduled report: all checks healthy'
+```
+
+Without `--text`, the command reads UTF-8 stdin. Repeat `--image /absolute/export.png` to attach files from the existing media export roots. The CLI must have a stable `--id`: reuse it when retrying the same event/run. An accepted result is durably queued, not confirmed delivered. Saved text and image parts use the existing formatter, shared Teams request budget, retention, authentication renewal and uncertain-send reconciliation. No agent invocation, read receipt or reaction is generated. Revoking a target cancels its unsent queued results. Deduplication lasts for the configured job/dedup retention period, not forever.
+
+Install [the teams-send skill](skills/teams-send/SKILL.md) into the existing agent's skills directory. Copy its `config.example.json` to `config.local.json`, then choose the target alias and socket there. Its Python wrapper reads that configuration, so a report/cron skill can select its destination without embedding credentials or thread IDs. Ensure `openclaw-teams-send` is on that agent's PATH. Other scripted skills can call the same CLI with their own configured `target` value.
+
+For OpenClaw agent cron jobs, ask the job to compute its report and call the skill sender, with `--no-deliver` to suppress duplicate fallback announcements. For command cron jobs, let the report script call the sender with its generated text and stable run ID. This does not redirect existing cron jobs automatically.
+
+Explicit channel thread IDs (`@thread.tacv2` / `@thread.skype`) can be configured as outbound destinations. Posting depends on that user's channel membership and tenant permissions; live deployment validation currently covers DM/group transport, not team-channel posting. Incoming channel polling remains excluded. Verify a channel destination before scheduling production reports to it.

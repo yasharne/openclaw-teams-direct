@@ -1,0 +1,4 @@
+{
+  "target": "report",
+  "socket": "/var/lib/openclaw-teams-direct/outbound.sock"
+}

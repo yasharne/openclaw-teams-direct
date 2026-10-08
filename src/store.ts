@@ -152,6 +152,13 @@ export class Store {
       kind,
       cutoff,
     );
+    if (kind !== "outbound")
+      this.run(
+        "UPDATE chats SET kind=?,cursor=?,link=NULL,scan_done=0 WHERE id=? AND kind='outbound'",
+        kind,
+        cutoff,
+        id,
+      );
   }
   pause(chat: string, reason: string) {
     this.run("UPDATE chats SET reason=? WHERE id=?", reason, chat);

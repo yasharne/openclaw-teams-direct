@@ -8,7 +8,8 @@
     "node": ">=24.12"
   },
   "bin": {
-    "openclaw-teams-direct": "dist/src/cli.js"
+    "openclaw-teams-direct": "dist/src/cli.js",
+    "openclaw-teams-send": "dist/src/send.js"
   },
   "files": [
     "dist/src",
@@ -16,7 +17,8 @@
     "SECURITY.md",
     "examples",
     "service",
-    "LICENSE"
+    "LICENSE",
+    "skills"
   ],
   "scripts": {
     "build": "tsc",

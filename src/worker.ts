@@ -18,7 +18,11 @@ export async function work(
     chat = String(job.chat),
     kind = String(job.kind),
     sender = String(job.sender);
-  if (!stillAllowed(c, chat, kind, sender)) {
+  if (
+    !(kind === "outbound"
+      ? c.outbound.enabled && c.outbound.targets[sender] === chat
+      : stillAllowed(c, chat, kind, sender))
+  ) {
     store.state(id, "canceled");
     return;
   }

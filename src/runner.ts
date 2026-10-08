@@ -7,6 +7,7 @@ import { Store } from "./store.js";
 import { normalize, allowedDM } from "./policy.js";
 import { verifyGateway } from "./openclaw.js";
 import { work } from "./worker.js";
+import { listenOutbound } from "./outbound.js";
 const event = (name: string, extra: Record<string, unknown> = {}) =>
   console.log(JSON.stringify({ event: name, ...extra }));
 export async function openStore(c: Config) {
@@ -59,6 +60,7 @@ export async function run(file: string) {
   let pollIndex = 0,
     nextDiscovery = 0,
     lastCleanup = 0;
+  let outbound: Awaited<ReturnType<typeof listenOutbound>>;
   try {
     const credentialFile = join(c.stateDir, "credentials.json");
     let credentialStamp = (await lstat(credentialFile)).mtimeMs;
@@ -82,6 +84,7 @@ export async function run(file: string) {
       }
     }
     await verifyGateway(c);
+    outbound = await listenOutbound(() => c, store);
     event("ready", {
       groups: c.groups.length,
       dmSenders: c.dmSenders.length,
@@ -112,11 +115,16 @@ export async function run(file: string) {
         fresh.requestsPerMinute !== c.requestsPerMinute ||
         fresh.maxInFlight !== c.maxInFlight ||
         fresh.requestTimeoutMs !== c.requestTimeoutMs ||
+        fresh.outbound.socketPath !== c.outbound.socketPath ||
+        fresh.outbound.enabled !== c.outbound.enabled ||
         JSON.stringify(fresh.openclaw) !== JSON.stringify(c.openclaw)
       )
         throw new Error("restart-required-for-connection-change");
       const added = fresh.groups.filter(
-        (g) => !store.get("SELECT id FROM chats WHERE id=?", g.id),
+        (g) =>
+          !store.get("SELECT id FROM chats WHERE id=?", g.id) ||
+          store.get("SELECT kind FROM chats WHERE id=?", g.id)?.kind ===
+            "outbound",
       );
       for (const g of added) {
         const clock = await teams.identity();
@@ -160,7 +168,11 @@ export async function run(file: string) {
           for (const chat of page.conversations) {
             if (typeof chat.id !== "string" || !chat.id.startsWith("19:"))
               throw new TransportError("malformed-conversation");
-            if (store.get("SELECT id FROM chats WHERE id=?", chat.id)) continue;
+            const existingChat = store.get(
+              "SELECT kind FROM chats WHERE id=?",
+              chat.id,
+            );
+            if (existingChat && existingChat.kind !== "outbound") continue;
             const isGroup = chat.id.endsWith("@thread.v2");
             if (
               !chat.id.endsWith("@unq.gbl.spaces") &&
@@ -211,10 +223,11 @@ export async function run(file: string) {
         .all("SELECT * FROM chats WHERE reason IS NULL ORDER BY id")
         .filter(
           (r) =>
-            r.kind === "dm" ||
-            c.groups.some((g) => g.id === r.id) ||
-            (c.everywhereSenders.length > 0 &&
-              String(r.id).endsWith("@thread.v2")),
+            r.kind !== "outbound" &&
+            (r.kind === "dm" ||
+              c.groups.some((g) => g.id === r.id) ||
+              (c.everywhereSenders.length > 0 &&
+                String(r.id).endsWith("@thread.v2"))),
         );
       if (eligible.length && store.pending() < c.maxQueue) {
         const chat = eligible[pollIndex++ % eligible.length]!;
@@ -287,6 +300,7 @@ export async function run(file: string) {
       process.exitCode = 1;
     }
   } finally {
+    await outbound?.close();
     store.release();
     store.close();
     process.removeListener("SIGINT", shutdown);
