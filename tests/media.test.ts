@@ -147,6 +147,7 @@ test("image turn downloads authorized AMS bytes, passes OpenClaw image parts, pe
     if (input.content.includes("<img")) {
       imageSends++;
       assert.match(input.content, /uploaded-id/);
+      assert.match(input.content, /Image reply/);
     }
     res.end(JSON.stringify({ OriginalArrivalTime: Date.now() }));
   });
@@ -188,6 +189,7 @@ test("image turn downloads authorized AMS bytes, passes OpenClaw image parts, pe
       2000,
     );
     await work(f.c, f.s, teams, invoke);
+    assert.equal(f.s.get("SELECT COUNT(*) AS n FROM parts")?.n, 1);
     assert.equal(
       f.s.get("SELECT kind FROM parts WHERE kind='image'")?.kind,
       "image",
@@ -318,8 +320,9 @@ test("returning a received image uses only current-turn bytes and rejects missin
       splitReply,
       [input],
     );
-    assert.equal(parts[0], "Here it is.");
-    assert.deepEqual(parts[1], {
+    assert.equal(parts.length, 1);
+    assert.deepEqual(parts[0], {
+      caption: "Here it is.",
       image: png.toString("base64"),
       mime: "image/png",
     });

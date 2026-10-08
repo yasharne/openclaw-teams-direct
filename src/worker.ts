@@ -104,6 +104,7 @@ export async function work(
         chat,
         object,
         String(store.nextPart(id)?.client_id),
+        image.caption,
       );
     } else
       confirmed = await teams.send(

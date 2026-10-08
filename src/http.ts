@@ -304,12 +304,17 @@ export class Teams {
   media(limit: number) {
     return new MediaClient(this.token, this.scheduler, this.timeout, limit);
   }
-  async sendImage(chat: string, object: string, clientId: string) {
+  async sendImage(
+    chat: string,
+    object: string,
+    clientId: string,
+    caption = "",
+  ) {
     if (!/^[a-zA-Z0-9_-]{1,200}$/.test(object)) throw Error("invalid-image-id");
     const r = await this.request(
       `users/ME/conversations/${encodeURIComponent(chat)}/messages`,
       {
-        content: `<img src="https://as-prod.asyncgw.teams.microsoft.com/v1/objects/${object}/views/imgo" itemscope="" itemtype="http://schema.skype.com/AMSImage">`,
+        content: `${caption ? formatReply(caption) + "<br>" : ""}<img src="https://as-prod.asyncgw.teams.microsoft.com/v1/objects/${object}/views/imgo" itemscope="" itemtype="http://schema.skype.com/AMSImage">`,
         messagetype: "RichText/Html",
         contenttype: "text",
         clientmessageid: clientId,

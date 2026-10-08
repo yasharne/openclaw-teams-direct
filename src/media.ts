@@ -11,6 +11,7 @@ import {
 export const AMS = "https://as-prod.asyncgw.teams.microsoft.com/v1/objects";
 const objectId = (id: string) => /^[a-zA-Z0-9_-]{1,200}$/.test(id);
 export interface ImagePart {
+  caption?: string;
   image: string;
   mime: string;
 }
@@ -234,6 +235,12 @@ export async function replyParts(
       } else image = await readOutboundImage(file, c);
       total += Buffer.from(image.image, "base64").length;
       if (total > 10485760) throw Error("images-too-large");
+      // Keep the last text chunk with the first image in one Teams message.
+      if (
+        !parts.some((p) => typeof p !== "string") &&
+        typeof parts.at(-1) === "string"
+      )
+        image.caption = parts.pop() as string;
       parts.push(image);
     } catch {
       parts.push(
