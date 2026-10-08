@@ -139,7 +139,7 @@ export function validateConfig(raw: unknown): Config {
     (c.outbound.enabled && !isAbsolute(c.outbound.socketPath)) ||
     Object.entries(object(c.outbound.targets)).some(
       ([alias, id]) =>
-        !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(alias) ||
+        !/^[a-z0-9][a-z0-9_.-]{0,63}$/.test(alias) ||
         typeof id !== "string" ||
         !/^19:[a-zA-Z0-9_.:-]{1,250}@(thread\.v2|thread\.tacv2|thread\.skype|unq\.gbl\.spaces)$/.test(
           id,
