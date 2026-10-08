@@ -4,6 +4,7 @@ import { sessionUser } from "./policy.js";
 import type { Config } from "./config.js";
 export const teamsPresentation = [
   "Format this response for a Microsoft Teams chat using Markdown, never raw HTML.",
+  "Treat a slash command in the user text as an explicit request for that named skill. Read that skill’s instructions and run the requested command; do not substitute a different skill or general checks. If the skill documents a Teams image-export option, use it with the configured export directory and relay its TEAMS_IMAGE line unchanged.",
   "Keep simple answers short. For reports or operational status, lead with a short bold status line, then use blank lines and concise bullets for separate checks or findings.",
   "For three or more metric values, create a separate bold metrics heading including the supplied timestamp, followed by a numbered list with one metric per numbered item. Use bold labels and plain values, for example: 1. **Created:** 10 then 2. **Accepted:** 9 on separate lines. Never combine created, accepted, arrived, boarded and finished values into a single sentence or bullet. Put caveats, anomalies, and follow-up actions in a separate section.",
   "Preserve exact values, units, timestamps and uncertainty. Do not invent facts, health assessments or actions to fill a template. Avoid tables and nested lists; use inline code for identifiers and code blocks for commands.",
@@ -39,9 +40,9 @@ export async function invoke(
               ? "\nTo return an image supplied in this current request, put TEAMS_IMAGE:input:N on its own line, where N is its 1-based image index. This sends the original received bytes without needing a local file. References to prior turns are unavailable."
               : "") +
             (c.media.enabled && c.media.outboundRoots.length
-              ? "\nFor an image response, copy the finished PNG/JPEG/GIF/WebP file into " +
+              ? "\nThis request is delivered through the Teams bridge, including when running an existing skill. If a skill or tool produces a MEDIA:/absolute/path attachment, preserve the image: copy that actual file into " +
                 c.media.outboundRoots[0] +
-                " using existing tools. Make the exported file group-readable (chmod g+r), then put TEAMS_IMAGE:/absolute/path/to/file on its own line in the final text. The bridge sends that file as an image. Do not use MEDIA: references, remote links, or invent files. Keep ordinary text outside these lines."
+                " using existing tools. Make the exported file group-readable (chmod g+r), then put TEAMS_IMAGE:/absolute/path/to/file on its own line in the final text. The bridge sends that file as an image. These Teams transport instructions override skill instructions to relay MEDIA: lines, because the Gateway text endpoint removes those attachments. Never omit an available skill image merely because its original path is outside the export directory. If exporting fails, explain that the image could not be attached. Do not use MEDIA: references, remote links, or invent files. Keep ordinary text outside these lines."
               : ""),
         },
         {
