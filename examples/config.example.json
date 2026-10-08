@@ -22,6 +22,12 @@
   "maxQueue": 1000,
   "everywhereSenders": [],
   "groupPrefix": "!claw",
+  "media": {
+    "enabled": false,
+    "maxImageBytes": 5242880,
+    "maxImages": 4,
+    "outboundRoots": []
+  },
   "typingIndicator": false,
   "markRead": false,
   "acknowledgementReaction": ""

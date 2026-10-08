@@ -15,6 +15,12 @@ export interface Config {
   dmSenders: string[];
   everywhereSenders: string[];
   groupPrefix: string;
+  media: {
+    enabled: boolean;
+    maxImageBytes: number;
+    maxImages: number;
+    outboundRoots: string[];
+  };
   typingIndicator: boolean;
   markRead: boolean;
   acknowledgementReaction: string;
@@ -55,6 +61,7 @@ const known = new Set([
   "dmSenders",
   "everywhereSenders",
   "groupPrefix",
+  "media",
   "typingIndicator",
   "markRead",
   "acknowledgementReaction",
@@ -84,6 +91,12 @@ export function validateConfig(raw: unknown): Config {
     namespace: "teams-direct",
     everywhereSenders: [],
     groupPrefix: "!claw",
+    media: {
+      enabled: false,
+      maxImageBytes: 5242880,
+      maxImages: 4,
+      outboundRoots: [],
+    },
     typingIndicator: false,
     markRead: false,
     acknowledgementReaction: "",
@@ -109,6 +122,26 @@ export function validateConfig(raw: unknown): Config {
     !/^[a-z0-9_-]{0,64}$/.test(c.acknowledgementReaction)
   )
     throw new Error("config-acknowledgement");
+  keys(object(c.media), [
+    "enabled",
+    "maxImageBytes",
+    "maxImages",
+    "outboundRoots",
+  ]);
+  if (
+    typeof c.media.enabled !== "boolean" ||
+    !Number.isSafeInteger(c.media.maxImageBytes) ||
+    c.media.maxImageBytes < 1 ||
+    c.media.maxImageBytes > 10485760 ||
+    !Number.isSafeInteger(c.media.maxImages) ||
+    c.media.maxImages < 1 ||
+    c.media.maxImages > 8 ||
+    !Array.isArray(c.media.outboundRoots) ||
+    c.media.outboundRoots.some(
+      (root) => typeof root !== "string" || !isAbsolute(root) || root === "/",
+    )
+  )
+    throw Error("config-media");
   const groupIds = new Set();
   for (const g of c.groups) {
     keys(object(g), ["id", "senders", "prefix"]);

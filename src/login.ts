@@ -1,4 +1,4 @@
-import { chromium, type Request } from "playwright-core";
+import { chromium, type Page, type Request } from "playwright-core";
 import type { Token } from "./http.js";
 export function inspectHeaders(
   url: string,
@@ -80,14 +80,62 @@ export async function captureFromBrowser(
       context.on("request", handler);
     });
     // Observe ordinary browser requests; no custom authentication protocol,
-    // no interception that pauses requests, no keyring or cache fallback.
+    // no interception that pauses requests, no operating-system keyring access.
     void pages[0]!
       .reload({ waitUntil: "domcontentloaded", timeout })
       .catch(() => {});
-    return await captured;
+    const token = await captured;
+    const amsToken = await captureMediaToken(pages[0]!).catch(() => undefined);
+    return { ...token, ...(amsToken ? { amsToken } : {}) };
   } finally {
     if (timer) clearTimeout(timer);
     context.off("request", handler);
     await browser.close();
+  }
+}
+
+/** Read only the Teams image-upload access token from this signed-in page's MSAL store. */
+export async function captureMediaToken(
+  page: Page,
+): Promise<string | undefined> {
+  return page.evaluate(() => {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.includes("accesstoken")) continue;
+      try {
+        const value = JSON.parse(localStorage.getItem(key) ?? "");
+        if (
+          typeof value.target !== "string" ||
+          !value.target
+            .split(" ")
+            .some((scope: string) =>
+              scope.startsWith("https://ic3.teams.office.com/"),
+            ) ||
+          typeof value.secret !== "string"
+        )
+          continue;
+        if (Number(value.expiresOn) * 1000 > Date.now() + 60000)
+          return value.secret as string;
+      } catch {
+        /* Ignore unrelated or expired token entries. */
+      }
+    }
+    return undefined;
+  });
+}
+
+export function verifyMediaAccount(token: Token, accountId: string) {
+  if (!token.amsToken) return;
+  try {
+    const claims = JSON.parse(
+      Buffer.from(token.amsToken.split(".")[1] ?? "", "base64url").toString(),
+    );
+    if (
+      typeof claims.oid !== "string" ||
+      `8:orgid:${claims.oid}`.toLowerCase() !== accountId.toLowerCase()
+    )
+      throw Error("media-account-mismatch");
+  } catch {
+    throw Error("media-account-mismatch");
   }
 }

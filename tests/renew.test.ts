@@ -106,3 +106,36 @@ test("wrong account, login prompts and transport errors preserve existing creden
     f.close();
   }
 });
+
+test("media expiry renews independently and wrong media-account tokens cannot replace credentials", async () => {
+  const f = fixture();
+  const mediaJwt = (oid: string, seconds: number) =>
+    `header.${Buffer.from(JSON.stringify({ oid: oid.split(":").at(-1), exp: Math.floor(Date.now() / 1000) + seconds })).toString("base64url")}.signature`;
+  try {
+    f.c.media.enabled = true;
+    const file = join(f.dir, "credentials.json");
+    const old = {
+      skypeToken: jwt(Math.floor(Date.now() / 1000) + 7200),
+      region: "apac",
+      amsToken: mediaJwt(self, 600),
+    };
+    await protectedWrite(file, old);
+    await assert.rejects(
+      renewCredentials(f.c, "/profile", "/chrome", false, {
+        capture: async () => ({ ...old, amsToken: mediaJwt(other, 7200) }),
+        identity: async () => ({ id: self, date: null }),
+      }),
+      /media-account-mismatch/,
+    );
+    assert.deepEqual(await protectedRead(file), old);
+    const next = { ...old, amsToken: mediaJwt(self, 7200) };
+    const result = await renewCredentials(f.c, "/profile", "/chrome", false, {
+      capture: async () => next,
+      identity: async () => ({ id: self, date: null }),
+    });
+    assert.equal(result.event, "credentials-renewed");
+    assert.deepEqual(await protectedRead(file), next);
+  } finally {
+    f.close();
+  }
+});

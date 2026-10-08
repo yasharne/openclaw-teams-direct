@@ -1,3 +1,4 @@
+import type { ImagePart } from "./media.js";
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { hostname } from "node:os";
@@ -32,6 +33,16 @@ export class Store {
       CREATE INDEX IF NOT EXISTS jobs_chat_order ON jobs(chat,id,status);
       CREATE INDEX IF NOT EXISTS jobs_work ON jobs(status,next_at,chat,id);
       CREATE TABLE IF NOT EXISTS parts(job INTEGER NOT NULL REFERENCES jobs(id),part INTEGER NOT NULL,body TEXT,status TEXT NOT NULL,client_id TEXT,message_id TEXT,PRIMARY KEY(job,part));`);
+    for (const [table, column, definition] of [
+      ["jobs", "image_refs", "TEXT"],
+      ["parts", "kind", "TEXT NOT NULL DEFAULT 'text'"],
+      ["parts", "ams_id", "TEXT"],
+    ]) {
+      if (
+        !this.all(`PRAGMA table_info(${table})`).some((r) => r.name === column)
+      )
+        this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
     const version = Number(
       this.db.prepare("PRAGMA user_version").get()?.user_version ?? 0,
     );
@@ -246,6 +257,12 @@ export class Store {
           now,
         );
         this.run(
+          "UPDATE jobs SET image_refs=? WHERE chat=? AND message_id=?",
+          JSON.stringify(c.media.enabled ? (m.images ?? []) : []),
+          chat,
+          m.id,
+        );
+        this.run(
           "INSERT OR IGNORE INTO acknowledgements(job,client_id,read_state,reaction_state) SELECT id,?,?,? FROM jobs WHERE chat=? AND message_id=?",
           m.clientId ?? m.id,
           c.markRead ? "pending" : "disabled",
@@ -308,14 +325,15 @@ export class Store {
       this.meta("last-worker-chat", String(j?.chat));
     });
   }
-  response(id: number, parts: string[]) {
+  response(id: number, parts: (string | ImagePart)[]) {
     this.tx(() => {
       parts.forEach((p, i) =>
         this.run(
-          "INSERT INTO parts(job,part,body,status) VALUES(?,?,?,'ready')",
+          "INSERT INTO parts(job,part,body,kind,status) VALUES(?,?,?,?,'ready')",
           id,
           i,
-          p,
+          typeof p === "string" ? p : JSON.stringify(p),
+          typeof p === "string" ? "text" : "image",
         ),
       );
       this.state(id, "response_ready");
@@ -412,7 +430,7 @@ export class Store {
       );
       for (const j of exp) {
         this.fail(Number(j.id), String(j.chat), "expired");
-        this.run("UPDATE jobs SET body=NULL WHERE id=?", j.id);
+        this.run("UPDATE jobs SET body=NULL,image_refs=NULL WHERE id=?", j.id);
         this.run("UPDATE parts SET body=NULL WHERE job=?", j.id);
       }
       const completed = now - c.completedRetentionHours * 3600000;
@@ -421,7 +439,7 @@ export class Store {
         completed,
       );
       for (const j of done) {
-        this.run("UPDATE jobs SET body=NULL WHERE id=?", j.id);
+        this.run("UPDATE jobs SET body=NULL,image_refs=NULL WHERE id=?", j.id);
         this.run("UPDATE parts SET body=NULL WHERE job=?", j.id);
       }
       this.run(

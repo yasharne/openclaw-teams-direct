@@ -104,6 +104,27 @@ node dist/src/cli.js purge --config /absolute/config.local.json
 
 Completed/canceled/failed payloads expire after 24 hours; queued and uncertain payloads expire after seven days and require resolution. Dedup records below the cursor expire after 30 days; cursor-boundary IDs remain to prevent equal-timestamp replay. Logs report categories and counts without message bodies or raw transport errors. SQLite deletion and checkpointing do not guarantee forensic erasure from storage or backups.
 
+## Images
+
+Enable `media` explicitly in your private configuration:
+
+```json
+"media": {
+  "enabled": true,
+  "maxImageBytes": 5242880,
+  "maxImages": 4,
+  "outboundRoots": ["/var/lib/openclaw-teams-media"]
+}
+```
+
+Send an inline PNG, JPEG, GIF or WebP image to the bot in a DM, with an optional question. Image-only DMs ask the agent to describe the picture. In groups, put `!claw` and the question in the same image message; the prefix is still required. Existing sender permissions apply before any attachment is downloaded. Defaults allow four images, 5 MB each, with a 10 MB total limit per turn. Arbitrary external image URLs, SVGs and SharePoint file attachments are not fetched.
+
+The bridge downloads Teams-hosted inline images from a fixed media-service host and passes their bytes to the existing OpenClaw agent as `image_url` data parts. This requires a Gateway/model that accepts image inputs. No new agent or Gateway is created. Unsupported call, typing and file events are ignored rather than pausing the chat.
+
+For sending, create a dedicated export directory writable by the OpenClaw account and readable by the bridge account. Keep it outside home directories hidden by the service's `ProtectHome` setting. For example, make the directory owned by the OpenClaw user with the bridge group and mode `2750`; ensure generated image files grant that group read access. Configure that directory in `outboundRoots`. The bridge supplements agent presentation instructions to export finished images there. A final `TEAMS_IMAGE:/absolute/file/path.png` line becomes a native Teams image attachment; accompanying text stays a text reply. The agent can also return a currently received image with `TEAMS_IMAGE:input:1` (one-based input index), without accessing a local file. Only real files inside the configured roots are read. Symlinks, oversized files and unsupported signatures are rejected. Generated files in this export folder remain under your own cleanup policy.
+
+Image uploads require Teams' IC3 media access token. Login capture and automatic renewal also capture this token from the dedicated Teams page's MSAL browser storage, selecting only the media resource and verifying that its account matches the configured bot. Tokens remain in the protected credential file and are never printed. Media-token expiry triggers renewal, and saved image replies survive authentication expiry. Image bytes are saved in protected SQLite reply parts before sending and follow the existing payload retention policy. A successful upload object ID is persisted before message submission; ambiguous sends pause the chat and are not blindly repeated.
+
 ## Automatic saved-session renewal
 
 Install and customize [renewal service](service/openclaw-teams-renew.service) and [timer](service/openclaw-teams-renew.timer) alongside the bridge. Set the user and installation paths, and create a private `renewal.env` containing absolute paths:

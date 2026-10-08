@@ -1,3 +1,4 @@
+import { MediaClient } from "./media.js";
 export class TransportError extends Error {
   constructor(
     public category: string,
@@ -141,6 +142,7 @@ export interface Token {
   skypeToken: string;
   region: string;
   bearerToken?: string;
+  amsToken?: string;
 }
 export class Teams {
   readonly base: URL;
@@ -298,6 +300,27 @@ export class Teams {
       "PUT",
       true,
     );
+  }
+  media(limit: number) {
+    return new MediaClient(this.token, this.scheduler, this.timeout, limit);
+  }
+  async sendImage(chat: string, object: string, clientId: string) {
+    if (!/^[a-zA-Z0-9_-]{1,200}$/.test(object)) throw Error("invalid-image-id");
+    const r = await this.request(
+      `users/ME/conversations/${encodeURIComponent(chat)}/messages`,
+      {
+        content: `<img src="https://as-prod.asyncgw.teams.microsoft.com/v1/objects/${object}/views/imgo" itemscope="" itemtype="http://schema.skype.com/AMSImage">`,
+        messagetype: "RichText/Html",
+        contenttype: "text",
+        clientmessageid: clientId,
+        imdisplayname: this.displayName,
+        properties: { importance: "", subject: null },
+      },
+    );
+    const id = (r.data as { OriginalArrivalTime?: string | number })
+      ?.OriginalArrivalTime;
+    if (!id) throw new TransportError("uncertain", 0, true);
+    return String(id);
   }
   async typing(chat: string, active: boolean) {
     await this.request(

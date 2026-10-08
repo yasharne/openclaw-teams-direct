@@ -4,6 +4,7 @@ import type { Config } from "./config.js";
 export interface Message {
   id: string;
   clientId?: string;
+  images?: string[];
   arrival: number;
   sender: string;
   type: string;
@@ -22,15 +23,14 @@ export function normalize(raw: unknown): Message {
     !Number.isFinite(Date.parse(r.originalarrivaltime))
   )
     throw new Error("malformed-message");
+  const supported = ["Text", "RichText/Html", "RichText/UriObject"].includes(
+    r.messagetype,
+  );
   const system =
+    !supported ||
     r.messagetype.startsWith("ThreadActivity/") ||
     r.messagetype === "MessageDelete";
-  if (
-    !system &&
-    (!["Text", "RichText/Html"].includes(r.messagetype) ||
-      typeof r.from !== "string" ||
-      typeof r.content !== "string")
-  )
+  if (!system && (typeof r.from !== "string" || typeof r.content !== "string"))
     throw new Error("malformed-or-unsupported-message");
   const props = (r.properties ?? {}) as Record<string, unknown>;
   if (typeof props !== "object" || Array.isArray(props))
@@ -46,6 +46,7 @@ export function normalize(raw: unknown): Message {
       ).trim();
   return {
     id: r.id,
+    images: system ? [] : inlineImages(String(r.content)),
     ...(typeof r.clientmessageid === "string"
       ? { clientId: r.clientmessageid }
       : {}),
@@ -73,8 +74,16 @@ export function promptFor(
   kind: string,
   m: Message,
 ): string | null {
-  if (m.sender === c.accountId || m.deleted || m.edited || !m.text) return null;
-  if (kind === "dm") return allowedDM(c, m.sender) ? m.text : null;
+  const hasImages = c.media.enabled && Boolean(m.images?.length);
+  if (
+    m.sender === c.accountId ||
+    m.deleted ||
+    m.edited ||
+    (!m.text && !hasImages)
+  )
+    return null;
+  if (kind === "dm")
+    return allowedDM(c, m.sender) ? m.text || "Describe this image." : null;
   const g = c.groups.find((g) => g.id === chat);
   const prefix = g?.prefix ?? c.groupPrefix;
   if (
@@ -82,7 +91,10 @@ export function promptFor(
     !m.text.startsWith(prefix)
   )
     return null;
-  return m.text.slice(prefix.length).trim() || null;
+  return (
+    m.text.slice(prefix.length).trim() ||
+    (hasImages ? "Describe this image." : null)
+  );
 }
 export function stillAllowed(
   c: Config,
@@ -124,4 +136,32 @@ export function splitReply(text: string, limit: number): string[] {
     chunks.push(chars.splice(0, end).join(""));
   }
   return chunks.map((s, i) => `[${i + 1}/${chunks.length}] ${s}`);
+}
+
+/** Keep only opaque AMS object IDs; never fetch sender-controlled URLs. */
+export function inlineImages(content: string): string[] {
+  const ids = new Set<string>();
+  for (const tag of content.match(/<(?:img|URIObject)\b[^>]*>/gi) ?? []) {
+    const value = /\b(?:src|uri)\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1];
+    if (!value) continue;
+    try {
+      const u = new URL(decodeHTML(value));
+      if (
+        u.protocol !== "https:" ||
+        u.hostname !== "as-prod.asyncgw.teams.microsoft.com" ||
+        u.port ||
+        u.username ||
+        u.password
+      )
+        continue;
+      const match =
+        /^\/v1\/objects\/([a-zA-Z0-9_-]{1,200})(?:\/views\/[a-zA-Z0-9_-]+)?$/.exec(
+          u.pathname,
+        );
+      if (match) ids.add(match[1]!);
+    } catch {
+      /* Unsupported external pictures are not downloaded. */
+    }
+  }
+  return [...ids];
 }

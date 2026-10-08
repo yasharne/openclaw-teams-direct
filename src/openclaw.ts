@@ -15,6 +15,7 @@ export async function invoke(
   sender: string,
   text: string,
   epoch = 0,
+  images: string[] = [],
 ) {
   const token =
     process.env.OPENCLAW_TEAMS_GATEWAY_TOKEN ??
@@ -30,10 +31,33 @@ export async function invoke(
       user: sessionUser(c.accountId, chat, c.namespace, epoch),
       stream: false,
       messages: [
-        { role: "system", content: teamsPresentation },
+        {
+          role: "system",
+          content:
+            teamsPresentation +
+            (c.media.enabled
+              ? "\nTo return an image supplied in this current request, put TEAMS_IMAGE:input:N on its own line, where N is its 1-based image index. This sends the original received bytes without needing a local file. References to prior turns are unavailable."
+              : "") +
+            (c.media.enabled && c.media.outboundRoots.length
+              ? "\nFor an image response, copy the finished PNG/JPEG/GIF/WebP file into " +
+                c.media.outboundRoots[0] +
+                " using existing tools. Make the exported file group-readable (chmod g+r), then put TEAMS_IMAGE:/absolute/path/to/file on its own line in the final text. The bridge sends that file as an image. Do not use MEDIA: references, remote links, or invent files. Keep ordinary text outside these lines."
+              : ""),
+        },
         {
           role: "user",
-          content: JSON.stringify({ sender, chatType: kind, text }),
+          content: images.length
+            ? [
+                {
+                  type: "text",
+                  text: JSON.stringify({ sender, chatType: kind, text }),
+                },
+                ...images.map((url) => ({
+                  type: "image_url",
+                  image_url: { url },
+                })),
+              ]
+            : JSON.stringify({ sender, chatType: kind, text }),
         },
       ],
     },

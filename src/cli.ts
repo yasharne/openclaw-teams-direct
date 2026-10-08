@@ -54,7 +54,9 @@ async function main() {
     return;
   }
   if (command === "identity") {
-    const { captureFromBrowser } = await import("./login.js");
+    const { captureFromBrowser, verifyMediaAccount } = await import(
+      "./login.js"
+    );
     const token = await captureFromBrowser(Number(args.values.port));
     const teams = new Teams(
       token,
@@ -68,7 +70,9 @@ async function main() {
     return;
   }
   if (command === "login") {
-    const { captureFromBrowser } = await import("./login.js");
+    const { captureFromBrowser, verifyMediaAccount } = await import(
+      "./login.js"
+    );
     const token = await captureFromBrowser(Number(args.values.port));
     const teams = new Teams(
       token,
@@ -77,9 +81,11 @@ async function main() {
     );
     const identity = await teams.identity();
     if (identity.id !== c.accountId) throw new Error("login-account-mismatch");
+    verifyMediaAccount(token, c.accountId);
     await protectedWrite(join(c.stateDir, "credentials.json"), {
       skypeToken: token.skypeToken,
       region: token.region,
+      ...(token.amsToken ? { amsToken: token.amsToken } : {}),
     });
     const s = await openStore(c);
     try {

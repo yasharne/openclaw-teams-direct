@@ -3,7 +3,11 @@ import { join, isAbsolute } from "node:path";
 import { lstat } from "node:fs/promises";
 import type { Config } from "./config.js";
 import { protectedRead, protectedWrite, safeDirectory } from "./credentials.js";
-import { inspectHeaders } from "./login.js";
+import {
+  inspectHeaders,
+  captureMediaToken,
+  verifyMediaAccount,
+} from "./login.js";
 import { Teams, Scheduler, TransportError, type Token } from "./http.js";
 /** Unverified JWT expiry is only a scheduling hint; server identity is authoritative. */
 export function tokenExpiry(token: string): number | null {
@@ -67,7 +71,9 @@ export async function captureSavedSession(
         waitUntil: "domcontentloaded",
       })
       .catch(() => {});
-    return await captured;
+    const token = await captured;
+    const amsToken = await captureMediaToken(page).catch(() => undefined);
+    return { ...token, ...(amsToken ? { amsToken } : {}) };
   } finally {
     clearTimeout(timer);
     if (handler) context.off("request", handler);
@@ -87,7 +93,12 @@ export async function renewCredentials(
 ) {
   const file = join(c.stateDir, "credentials.json");
   const old = (await protectedRead(file)) as Token;
-  let due = force || renewalDue(old, (await lstat(file)).mtimeMs);
+  let due =
+    force ||
+    renewalDue(old, (await lstat(file)).mtimeMs) ||
+    (c.media.enabled &&
+      (!old.amsToken ||
+        (tokenExpiry(old.amsToken) ?? 0) - Date.now() <= 30 * 60000));
   if (!due) {
     try {
       if ((await dependencies.identity(old)).id !== c.accountId)
@@ -102,9 +113,14 @@ export async function renewCredentials(
   const token = await dependencies.capture();
   if ((await dependencies.identity(token)).id !== c.accountId)
     throw Error("login-account-mismatch");
+  verifyMediaAccount(token, c.accountId);
   await protectedWrite(file, {
     skypeToken: token.skypeToken,
     region: token.region,
+    ...(token.amsToken ? { amsToken: token.amsToken } : {}),
   });
-  return { event: "credentials-renewed" };
+  return {
+    event: "credentials-renewed",
+    mediaReady: !c.media.enabled || Boolean(token.amsToken),
+  };
 }
