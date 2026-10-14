@@ -45,6 +45,24 @@ export function callTarget(raw: unknown, alias: string) {
     url: `https://teams.microsoft.com/l/chat/${encodeURIComponent(t.chat)}/conversations`,
   };
 }
+export function callOutcome(
+  clicked: boolean,
+  hangup: boolean,
+  clickAttempted = false,
+) {
+  return {
+    phase: !clicked
+      ? clickAttempted
+        ? "call-click-unconfirmed"
+        : "failed-before-call"
+      : hangup
+        ? "ended"
+        : "browser-closed",
+    callButtonClicked: clicked,
+    ringConfirmed: false,
+    automaticRetry: false,
+  };
+}
 export async function verifyRecipient(page: Page, name: string) {
   const headings = page.getByRole("heading");
   for (let i = 0; i < 60; i++) {
@@ -94,7 +112,10 @@ async function main() {
     throw Error("invalid-call-alias");
   try {
     const prior = await protectedRead(receipt);
-    console.log(JSON.stringify({ duplicate: true, receipt: prior }));
+    console.log(
+      JSON.stringify({ duplicate: true, newCallPlaced: false, receipt: prior }),
+    );
+    process.exitCode = 2;
     return;
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
@@ -103,6 +124,7 @@ async function main() {
     | Awaited<ReturnType<typeof chromium.launchPersistentContext>>
     | undefined;
   let attempted = false,
+    clicked = false,
     hangup = false;
   try {
     context = await chromium.launchPersistentContext(c.profile, {
@@ -154,7 +176,45 @@ async function main() {
     } finally {
       scheduler.close();
     }
+    const audio = page.getByRole("button", { name: "Audio call", exact: true });
+    try {
+      await audio.click({ trial: true, timeout: 20000 });
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          callButtonDiagnostics: await page
+            .locator("button")
+            .evaluateAll((bs) =>
+              bs
+                .map((b) => ({
+                  label: b.getAttribute("aria-label"),
+                  title: b.getAttribute("title"),
+                  labelledBy: b.getAttribute("aria-labelledby"),
+                  text: b.textContent?.trim(),
+                  disabled: (b as HTMLButtonElement).disabled,
+                }))
+                .filter((b) =>
+                  /call/i.test([b.label, b.title, b.text].join(" ")),
+                ),
+            ),
+        }),
+      );
+      throw error;
+    }
     if (values.check) {
+      console.log(
+        JSON.stringify({
+          callControls: await page
+            .getByRole("button")
+            .evaluateAll((bs) =>
+              bs
+                .map(
+                  (b) => b.getAttribute("aria-label") || b.textContent?.trim(),
+                )
+                .filter((n) => n && /call/i.test(n)),
+            ),
+        }),
+      );
       console.log(JSON.stringify({ phase: "ready", target: values.target }));
       return;
     }
@@ -164,11 +224,10 @@ async function main() {
       { flag: "wx", mode: 0o600 },
     );
     attempted = true;
-    await page
-      .getByRole("button", { name: "Audio call", exact: true })
-      .click({ timeout: 15000 });
+    await audio.click({ timeout: 15000 });
+    clicked = true;
     console.log(
-      JSON.stringify({ phase: "call-started", target: values.target }),
+      JSON.stringify({ phase: "call-button-clicked", target: values.target }),
     );
     await page.waitForTimeout(c.ringSeconds * 1000);
     for (const p of context.pages()) {
@@ -188,14 +247,13 @@ async function main() {
     await context?.close();
     if (attempted)
       await protectedWrite(receipt, {
-        phase: hangup ? "ended" : "browser-closed",
+        ...callOutcome(clicked, hangup, attempted),
         time: Date.now(),
-        automaticRetry: false,
       });
   }
   console.log(
     JSON.stringify({
-      phase: hangup ? "ended" : "browser-closed",
+      ...callOutcome(clicked, hangup, attempted),
       target: values.target,
     }),
   );
@@ -205,9 +263,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
     console.error(
       JSON.stringify({
         diagnostic:
-          error instanceof Error
-            ? error.message.split("\n")[0]?.slice(0, 400)
-            : "unknown",
+          error instanceof Error ? error.message.slice(0, 4000) : "unknown",
         error:
           error instanceof Error && /^[a-z][a-z0-9-]+$/.test(error.message)
             ? error.message

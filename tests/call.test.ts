@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { callTarget, verifyRecipient } from "../src/call.js";
+import { callTarget, verifyRecipient, callOutcome } from "../src/call.js";
 import type { Page } from "playwright-core";
 const c = {
   accountId: "8:orgid:00000000-0000-4000-8000-000000000001",
@@ -62,4 +62,15 @@ test("recipient verification uses heading text independent of accessible-name de
     verifyRecipient(duplicate, "Example Person"),
     /not-confirmed/,
   );
+});
+
+test("failed call clicks cannot become completed receipts and UI completion never confirms ringing", () => {
+  assert.equal(callOutcome(false, false).phase, "failed-before-call");
+  assert.equal(callOutcome(false, true).phase, "failed-before-call");
+  assert.equal(callOutcome(false, false, true).phase, "call-click-unconfirmed");
+  assert.equal(callOutcome(true, true).phase, "ended");
+  assert.equal(callOutcome(true, false).phase, "browser-closed");
+  for (const clicked of [false, true])
+    for (const left of [false, true])
+      assert.equal(callOutcome(clicked, left).ringConfirmed, false);
 });

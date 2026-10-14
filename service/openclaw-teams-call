@@ -19,4 +19,15 @@ command=['sudo','-n','systemd-run','--wait','--collect','--unit=teams-ring-'+uui
  '--property=MemoryMax=900M','--property=TasksMax=256','--property=KillMode=control-group',
  '--',c['node'],c['script'],'--config',c['config'],'--target',args.target,'--id',args.id]
 if args.check:command.append('--check')
-raise SystemExit(subprocess.run(command).returncode)
+result=subprocess.run(command,capture_output=True,text=True)
+unit=next(v.split('=',1)[1] for v in command if v.startswith('--unit='))
+logs=subprocess.run(['sudo','-n','journalctl','-u',unit,'--no-pager','-o','cat'],capture_output=True,text=True)
+records=[]
+for line in logs.stdout.splitlines():
+    try:
+        item=json.loads(line)
+        record={k:item[k] for k in ('phase','target','duplicate','newCallPlaced','error','receipt') if k in item}
+        if record:records.append(record)
+    except (ValueError,TypeError):pass
+print(json.dumps({'serviceExitCode':result.returncode,'results':records,'ringConfirmed':False}))
+raise SystemExit(result.returncode)
