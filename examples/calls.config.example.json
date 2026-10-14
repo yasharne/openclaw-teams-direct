@@ -1,0 +1,13 @@
+{
+  "accountId": "8:orgid:00000000-0000-4000-8000-000000000001",
+  "profile": "/var/lib/teams-bridge/browser-profile",
+  "browser": "/absolute/path/to/chromium",
+  "stateDir": "/var/lib/teams-bridge/calls",
+  "ringSeconds": 12,
+  "targets": {
+    "approved-person": {
+      "chat": "19:00000000-0000-4000-8000-000000000001_00000000-0000-4000-8000-000000000002@unq.gbl.spaces",
+      "name": "Example Person"
+    }
+  }
+}

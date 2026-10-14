@@ -184,3 +184,17 @@ Install [the teams-send skill](skills/teams-send/SKILL.md) into the existing age
 For OpenClaw agent cron jobs, ask the job to compute its report and call the skill sender, with `--no-deliver` to suppress duplicate fallback announcements. For command cron jobs, let the report script call the sender with its generated text and stable run ID. This does not redirect existing cron jobs automatically.
 
 Explicit channel thread IDs (`@thread.tacv2` / `@thread.skype`) can be configured as outbound destinations. Posting depends on that user's channel membership and tenant permissions; live deployment validation currently covers DM/group transport, not team-channel posting. Incoming channel polling remains excluded. Verify a channel destination before scheduling production reports to it.
+
+### Ring-only Teams calls
+
+The optional caller uses the existing signed-in Teams browser profile and the approved person's exact DM thread ID. Install `service/openclaw-teams-call` on the host's PATH, and prepare root-owned `/etc/openclaw-teams-call-launcher.json` using `examples/call-launcher.example.json`. The launcher account needs its existing permission to run the bounded systemd command; this repository does not grant sudo access. Store a mode-0600 caller configuration, following `examples/calls.config.example.json`, under a private directory owned by the browser account. Calling recipients are explicitly approved there, independently of messaging aliases.
+
+Install `skills/teams-call` in the existing agent's skills directory and set its default target in `config.local.json`. A skill or an explicitly authorized cron job can then run:
+
+```bash
+python3 ~/.openclaw/skills/teams-call/scripts/call.py --id incident-event-123
+```
+
+`--target` selects another approved person; `--check` verifies navigation and browser account without dialing. The caller follows Microsoft's documented chat-ID deep link, checks the exact recipient heading text, verifies the signed-in account using browser-observed Teams credentials, and clicks Audio call. Microphone tracks are disabled. The configured ring window is 5–30 seconds; it then attempts to leave and closes Chromium. Ring duration is best effort: a remote answer/rejection or delayed server disconnect can change it. A receipt is written before initiating a call, and the same target/event ID is never automatically dialed again after an attempt. Unknown outcomes require reconciliation, not a fresh event ID.
+
+The systemd launcher caps the browser at two minutes, 900 MB, and 256 tasks, killing the process group on timeout. Saved-profile contention with login renewal fails without initiating a call; do not automatically retry a recorded attempt. No call schedule is enabled automatically. The user-session call route was confirmed by a recipient's actual ringing notification; the reusable caller's final identity/navigation check and duplicate suppression were verified without another test call. Browser UI changes or sign-in requirements can still prevent calls.

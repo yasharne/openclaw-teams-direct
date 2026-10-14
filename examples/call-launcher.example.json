@@ -1,0 +1,6 @@
+{
+  "user": "teams-bridge",
+  "node": "/usr/bin/node",
+  "script": "/opt/openclaw-teams-direct/dist/src/call.js",
+  "config": "/var/lib/teams-bridge/calls.local.json"
+}
